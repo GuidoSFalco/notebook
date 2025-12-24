@@ -1,0 +1,71 @@
+
+export const EVENTS = [
+  {
+    id: '1',
+    title: 'Neon Summer Festival',
+    date: 'Vie, 12 Ago • 20:00',
+    location: 'Playa Waikiki',
+    image: 'https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: '$25.00',
+    organizer: {
+      name: 'Vibes Music',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
+    },
+    description: 'El festival de música electrónica más grande del verano. Ven a disfrutar de los mejores DJs internacionales en un ambiente neón único frente al mar.',
+    attendees: 1200,
+    category: 'Música',
+  },
+  {
+    id: '2',
+    title: 'Art & Wine Night',
+    date: 'Sab, 13 Ago • 18:30',
+    location: 'Galería Moderna',
+    image: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: '$15.00',
+    organizer: {
+      name: 'Art Collective',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
+    },
+    description: 'Una noche de arte contemporáneo acompañada de una selección de los mejores vinos locales. Conoce a los artistas y disfruta de música jazz en vivo.',
+    attendees: 85,
+    category: 'Arte',
+  },
+  {
+    id: '3',
+    title: 'Tech Startup Meetup',
+    date: 'Mar, 16 Ago • 19:00',
+    location: 'Innovation Hub',
+    image: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: 'Gratis',
+    organizer: {
+      name: 'Tech Community',
+      avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
+    },
+    description: 'Conecta con fundadores, desarrolladores e inversores. Charlas relámpago, networking y pizza gratis. ¡No te lo pierdas!',
+    attendees: 300,
+    category: 'Tecnología',
+  },
+  {
+    id: '4',
+    title: 'Clase de Yoga al Atardecer',
+    date: 'Dom, 14 Ago • 17:00',
+    location: 'Parque Central',
+    image: 'https://images.unsplash.com/photo-1588286840104-8957b019727f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    price: '$10.00',
+    organizer: {
+      name: 'Zen Life',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80',
+    },
+    description: 'Relaja tu mente y cuerpo con una sesión de yoga vinyasa mientras el sol se pone. Abierto a todos los niveles.',
+    attendees: 50,
+    category: 'Salud',
+  },
+];
+
+export const CATEGORIES = [
+  { id: '1', name: 'Música', icon: 'music' },
+  { id: '2', name: 'Arte', icon: 'palette' },
+  { id: '3', name: 'Tecnología', icon: 'cpu' },
+  { id: '4', name: 'Salud', icon: 'activity' },
+  { id: '5', name: 'Comida', icon: 'coffee' },
+];
