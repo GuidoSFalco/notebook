@@ -1,0 +1,240 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import { format, addDays } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar, Clock, CheckCircle } from 'lucide-react-native';
+import Button from '../components/Button';
+import { COLORS, SPACING, RADIUS } from '../constants/theme';
+
+const TIME_SLOTS = [
+  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
+];
+
+export default function BookingScreen() {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { professional } = route.params;
+
+  const [step, setStep] = useState(1);
+  const [selectedDate, setSelectedDate] = useState(professional.availability[0]);
+  const [selectedTime, setSelectedTime] = useState(null);
+
+  const handleConfirm = () => {
+    Alert.alert(
+      '¡Turno Confirmado!',
+      `Has reservado con ${professional.name} para el ${selectedDate} a las ${selectedTime}`,
+      [
+        {
+          text: 'Ir a Mis Turnos',
+          onPress: () => {
+            navigation.popToTop();
+            navigation.navigate('Appointments');
+          }
+        }
+      ]
+    );
+  };
+
+  const renderStep1 = () => (
+    <View>
+      <Text style={styles.stepTitle}>Seleccioná una fecha</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
+        {professional.availability.map((date, index) => {
+           // Simple date formatting simulation
+           const dayName = index === 0 ? 'Hoy' : index === 1 ? 'Mañana' : 'Lun'; 
+           const isSelected = selectedDate === date;
+
+           return (
+            <Button
+              key={date}
+              title={`${dayName}\n${date.split('-')[2]}`}
+              onPress={() => setSelectedDate(date)}
+              variant={isSelected ? 'primary' : 'outline'}
+              style={[styles.dateButton, isSelected ? null : styles.dateButtonOutline]}
+            />
+           );
+        })}
+      </ScrollView>
+
+      <Text style={styles.stepTitle}>Seleccioná un horario</Text>
+      <View style={styles.timeGrid}>
+        {TIME_SLOTS.map((time) => (
+          <Button
+            key={time}
+            title={time}
+            onPress={() => setSelectedTime(time)}
+            variant={selectedTime === time ? 'primary' : 'outline'}
+            style={styles.timeButton}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderStep2 = () => (
+    <View style={styles.confirmationContainer}>
+      <CheckCircle size={64} color={COLORS.success} style={{ marginBottom: SPACING.l }} />
+      <Text style={styles.confirmationTitle}>Confirmar Reserva</Text>
+      <Text style={styles.confirmationText}>Por favor revisá los datos de tu turno</Text>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Profesional</Text>
+            <Text style={styles.summaryValue}>{professional.name}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Fecha</Text>
+            <Text style={styles.summaryValue}>{selectedDate}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Horario</Text>
+            <Text style={styles.summaryValue}>{selectedTime}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Valor</Text>
+            <Text style={styles.summaryValue}>${professional.price}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.progressContainer}>
+        <View style={[styles.progressBar, { width: step === 1 ? '50%' : '100%' }]} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        {step === 1 ? renderStep1() : renderStep2()}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        {step === 1 ? (
+          <Button 
+            title="Continuar" 
+            onPress={() => setStep(2)}
+            disabled={!selectedDate || !selectedTime}
+            style={{ opacity: (!selectedDate || !selectedTime) ? 0.5 : 1 }}
+          />
+        ) : (
+          <Button 
+            title="Confirmar Reserva" 
+            onPress={handleConfirm}
+            style={{ backgroundColor: COLORS.success }}
+          />
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.light.background,
+  },
+  progressContainer: {
+    height: 4,
+    backgroundColor: COLORS.light.border,
+    width: '100%',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+  },
+  content: {
+    padding: SPACING.l,
+    paddingBottom: 100,
+  },
+  stepTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.light.text,
+    marginTop: SPACING.m,
+    marginBottom: SPACING.m,
+  },
+  dateScroll: {
+    flexDirection: 'row',
+    marginBottom: SPACING.l,
+  },
+  dateButton: {
+    width: 70,
+    height: 70,
+    marginRight: SPACING.s,
+    borderRadius: RADIUS.m,
+  },
+  dateButtonOutline: {
+    borderColor: COLORS.light.border,
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.s,
+  },
+  timeButton: {
+    width: '30%',
+    marginBottom: SPACING.s,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: SPACING.l,
+    backgroundColor: COLORS.light.card,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.light.border,
+    paddingBottom: SPACING.xl,
+  },
+  confirmationContainer: {
+    alignItems: 'center',
+    paddingTop: SPACING.xl,
+  },
+  confirmationTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.light.text,
+    marginBottom: SPACING.s,
+  },
+  confirmationText: {
+    fontSize: 16,
+    color: COLORS.light.textSecondary,
+    marginBottom: SPACING.xl,
+  },
+  summaryCard: {
+    width: '100%',
+    backgroundColor: COLORS.light.card,
+    padding: SPACING.l,
+    borderRadius: RADIUS.l,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.m,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.light.border,
+    paddingBottom: SPACING.s,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: COLORS.light.textSecondary,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.light.text,
+  },
+});
