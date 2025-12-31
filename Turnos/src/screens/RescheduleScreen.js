@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Alert, Linking, TouchableOpacity } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Clock, CheckCircle, ArrowRight, MessageCircle } from 'lucide-react-native';
 import Button from '../components/Button';
+import CustomCalendar from '../components/CustomCalendar';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 import { PROFESSIONALS } from '../constants/mockData';
 
@@ -17,7 +18,7 @@ export default function RescheduleScreen({ route, navigation }) {
   const professional = PROFESSIONALS.find(p => p.id === appointment.professionalId);
   
   const [step, setStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(appointment.date.split('T')[0]);
   const [selectedTime, setSelectedTime] = useState(null);
 
   const handleWhatsApp = () => {
@@ -83,25 +84,18 @@ export default function RescheduleScreen({ route, navigation }) {
       {renderCurrentAppointment()}
       
       <Text style={styles.stepHeader}>Seleccioná una nueva fecha</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-        {professional?.availability.map((date, index) => {
-           const dayName = index === 0 ? 'Hoy' : index === 1 ? 'Mañana' : 'Lun'; 
-           const isSelected = selectedDate === date;
-
-           return (
-            <Button
-              key={date}
-              title={`${dayName}\n${date.split('-')[2]}`}
-              onPress={() => {
-                  setSelectedDate(date);
-                  setSelectedTime(null); // Reset time when date changes
-              }}
-              variant={isSelected ? 'primary' : 'outline'}
-              style={[styles.dateButton, isSelected ? null : styles.dateButtonOutline]}
-            />
-           );
-        })}
-      </ScrollView>
+      
+      <View style={styles.calendarContainer}>
+        <CustomCalendar 
+            selectedDate={selectedDate}
+            onSelectDate={(date) => {
+                setSelectedDate(date);
+                setSelectedTime(null);
+            }}
+            originalDate={appointment.date.split('T')[0]}
+            blockedDates={professional?.fullDates}
+        />
+      </View>
 
       {selectedDate && (
           <>
@@ -175,16 +169,14 @@ export default function RescheduleScreen({ route, navigation }) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <Button 
             title="Cancelar" 
             variant="outline" 
             onPress={() => navigation.goBack()} 
             style={styles.backButton}
         />
-        <Text style={styles.title}>Cambiar Turno</Text>
-        <View style={{ width: 80 }} /> 
-      </View>
+      </View> */}
 
       <ScrollView contentContainerStyle={styles.content}>
         {step === 1 ? renderStep1() : renderStep2()}
@@ -201,21 +193,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: SPACING.m,
     paddingBottom: SPACING.m,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.light.border,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.light.text,
-  },
   backButton: {
       height: 36,
       paddingHorizontal: SPACING.m,
-      width: 80,
   },
   content: {
     padding: SPACING.l,
@@ -253,17 +239,8 @@ const styles = StyleSheet.create({
       marginBottom: SPACING.m,
       color: COLORS.light.text,
   },
-  dateScroll: {
+  calendarContainer: {
     marginBottom: SPACING.xl,
-  },
-  dateButton: {
-    width: 80,
-    height: 80,
-    marginRight: SPACING.s,
-    justifyContent: 'center',
-  },
-  dateButtonOutline: {
-    borderColor: COLORS.light.border,
   },
   timeGrid: {
     flexDirection: 'row',
@@ -274,6 +251,14 @@ const styles = StyleSheet.create({
   timeButton: {
     width: '30%',
     marginBottom: SPACING.s,
+  },
+  originalTimeButton: {
+      borderColor: COLORS.warning,
+      backgroundColor: '#FFF8E1',
+  },
+  originalTimeText: {
+      color: COLORS.warning,
+      fontWeight: '700',
   },
   footer: {
       marginTop: SPACING.l,

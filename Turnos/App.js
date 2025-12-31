@@ -14,3 +14,10 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+/*
+ ERROR  [ReferenceError: Property 'showFilters' doesn't exist]
+la modificacion del turno selecciona un dia antes en el calendario
+
+
+*/

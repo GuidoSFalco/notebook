@@ -18,7 +18,8 @@ export const PROFESSIONALS = [
     image: 'https://randomuser.me/api/portraits/men/32.jpg',
     price: 5000,
     about: 'Especialista en cardiología clínica con más de 15 años de experiencia. Enfoque en prevención y tratamiento de hipertensión.',
-    availability: ['2025-12-26', '2025-12-27', '2025-12-28'],
+    availability: ['2025-12-30', '2025-12-31', '2026-01-02', '2026-01-03', '2026-01-05', '2026-01-06', '2026-01-07', '2026-01-08'],
+    fullDates: ['2026-01-02', '2026-01-06'],
     phone: '5491112345678',
     coordinate: {
       latitude: -34.5627,
@@ -54,7 +55,7 @@ export const PROFESSIONALS = [
     image: 'https://randomuser.me/api/portraits/women/68.jpg',
     price: 3500,
     about: 'Odontología general y estética. Blanqueamientos, ortodoncia invisible y diseño de sonrisa.',
-    availability: ['2025-12-27', '2025-12-28'],
+    availability: ['2026-01-02', '2026-01-04', '2026-01-05', '2026-01-07'],
     phone: '5491111223344',
     coordinate: {
       latitude: -34.5883,
@@ -72,7 +73,8 @@ export const PROFESSIONALS = [
     image: 'https://randomuser.me/api/portraits/men/85.jpg',
     price: 4000,
     about: 'Planes de alimentación personalizados para deportistas de alto rendimiento y amateurs.',
-    availability: ['2025-12-26', '2025-12-30'],
+    availability: ['2025-12-30', '2026-01-02', '2026-01-03', '2026-01-06'],
+    fullDates: ['2025-12-30'],
     phone: '5491199887766',
     coordinate: {
       latitude: -34.5457,
