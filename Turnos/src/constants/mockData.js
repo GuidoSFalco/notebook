@@ -19,6 +19,7 @@ export const PROFESSIONALS = [
     price: 5000,
     about: 'Especialista en cardiología clínica con más de 15 años de experiencia. Enfoque en prevención y tratamiento de hipertensión.',
     availability: ['2025-12-26', '2025-12-27', '2025-12-28'],
+    phone: '5491112345678',
     coordinate: {
       latitude: -34.5627,
       longitude: -58.4563,
@@ -36,6 +37,7 @@ export const PROFESSIONALS = [
     price: 4500,
     about: 'Terapia cognitivo-conductual para adultos y adolescentes. Especializada en trastornos de ansiedad y estrés.',
     availability: ['2025-12-26', '2025-12-29'],
+    phone: '5491187654321',
     coordinate: {
       latitude: -34.5889,
       longitude: -58.4305,
@@ -53,6 +55,7 @@ export const PROFESSIONALS = [
     price: 3500,
     about: 'Odontología general y estética. Blanqueamientos, ortodoncia invisible y diseño de sonrisa.',
     availability: ['2025-12-27', '2025-12-28'],
+    phone: '5491111223344',
     coordinate: {
       latitude: -34.5883,
       longitude: -58.3938,
@@ -70,6 +73,7 @@ export const PROFESSIONALS = [
     price: 4000,
     about: 'Planes de alimentación personalizados para deportistas de alto rendimiento y amateurs.',
     availability: ['2025-12-26', '2025-12-30'],
+    phone: '5491199887766',
     coordinate: {
       latitude: -34.5457,
       longitude: -58.4636,
@@ -82,14 +86,36 @@ export const MY_APPOINTMENTS = [
     id: 'a1',
     professionalId: 'p1',
     date: '2025-12-28T10:00:00',
-    status: 'confirmed', // confirmed, cancelled, completed
-    service: 'Consulta General'
+    status: 'confirmed', // confirmed, cancelled, completed, reschedule_requested, cancellation_requested
+    service: 'Consulta General',
+    clientName: 'Guido Cliente',
+    clientPhone: '5491155556666'
   },
   {
     id: 'a2',
     professionalId: 'p2',
     date: '2025-12-15T16:30:00',
     status: 'completed',
-    service: 'Sesión de Terapia'
+    service: 'Sesión de Terapia',
+    clientName: 'Guido Cliente',
+    clientPhone: '5491155556666'
+  },
+  {
+    id: 'a3',
+    professionalId: 'p3',
+    date: '2025-12-30T14:00:00',
+    status: 'reschedule_requested',
+    service: 'Limpieza Dental',
+    clientName: 'Ana Perez',
+    clientPhone: '5491144443333'
+  },
+  {
+    id: 'a4',
+    professionalId: 'p4',
+    date: '2026-01-05T09:00:00',
+    status: 'cancellation_requested',
+    service: 'Plan Nutricional',
+    clientName: 'Carlos Ruiz',
+    clientPhone: '5491122221111'
   }
 ];

@@ -4,12 +4,15 @@ import { Home, Calendar, User, Map } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
 import MapScreen from '../screens/MapScreen';
 import AppointmentsScreen from '../screens/AppointmentsScreen';
+import ProfessionalAppointmentsScreen from '../screens/ProfessionalAppointmentsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { COLORS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
 
 export default function TabNavigator() {
+  const { role } = useAuth();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -40,9 +43,9 @@ export default function TabNavigator() {
       />
       <Tab.Screen 
         name="Appointments" 
-        component={AppointmentsScreen} 
+        component={role === 'professional' ? ProfessionalAppointmentsScreen : AppointmentsScreen} 
         options={{
-          tabBarLabel: 'Mis Turnos',
+          tabBarLabel: role === 'professional' ? 'Mi Agenda' : 'Mis Turnos',
           tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} />,
         }}
       />
