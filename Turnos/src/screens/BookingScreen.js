@@ -5,6 +5,7 @@ import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, Clock, CheckCircle } from 'lucide-react-native';
 import Button from '../components/Button';
+import CustomCalendar from '../components/CustomCalendar';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 const TIME_SLOTS = [
@@ -40,23 +41,17 @@ export default function BookingScreen() {
   const renderStep1 = () => (
     <View>
       <Text style={styles.stepTitle}>Seleccioná una fecha</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-        {professional.availability.map((date, index) => {
-           // Simple date formatting simulation
-           const dayName = index === 0 ? 'Hoy' : index === 1 ? 'Mañana' : 'Lun'; 
-           const isSelected = selectedDate === date;
-
-           return (
-            <Button
-              key={date}
-              title={`${dayName}\n${date.split('-')[2]}`}
-              onPress={() => setSelectedDate(date)}
-              variant={isSelected ? 'primary' : 'outline'}
-              style={[styles.dateButton, isSelected ? null : styles.dateButtonOutline]}
-            />
-           );
-        })}
-      </ScrollView>
+      
+      <View style={styles.calendarContainer}>
+        <CustomCalendar 
+          selectedDate={selectedDate}
+          onSelectDate={(date) => {
+              setSelectedDate(date);
+              setSelectedTime(null);
+          }}
+          blockedDates={professional.fullDates}
+        />
+      </View>
 
       <Text style={styles.stepTitle}>Seleccioná un horario</Text>
       <View style={styles.timeGrid}>
@@ -155,18 +150,8 @@ const styles = StyleSheet.create({
     marginTop: SPACING.m,
     marginBottom: SPACING.m,
   },
-  dateScroll: {
-    flexDirection: 'row',
+  calendarContainer: {
     marginBottom: SPACING.l,
-  },
-  dateButton: {
-    width: 70,
-    height: 70,
-    marginRight: SPACING.s,
-    borderRadius: RADIUS.m,
-  },
-  dateButtonOutline: {
-    borderColor: COLORS.light.border,
   },
   timeGrid: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { COLORS, RADIUS, SPACING } from '../constants/theme';
 
-export default function Button({ title, onPress, variant = 'primary', loading = false, style }) {
+export default function Button({ title, onPress, variant = 'primary', loading = false, style, textStyle }) {
   const isPrimary = variant === 'primary';
   
   return (
@@ -18,7 +18,7 @@ export default function Button({ title, onPress, variant = 'primary', loading = 
       {loading ? (
         <ActivityIndicator color={isPrimary ? '#FFF' : COLORS.primary} />
       ) : (
-        <Text style={[styles.text, isPrimary ? styles.textPrimary : styles.textOutline]}>
+        <Text style={[styles.text, isPrimary ? styles.textPrimary : styles.textOutline, textStyle]}>
           {title}
         </Text>
       )}
