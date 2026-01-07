@@ -5,7 +5,7 @@ export const EVENTS = [
     title: 'Neon Summer Festival',
     date: 'Vie, 12 Ago • 20:00',
     location: 'Playa Waikiki',
-    image: 'https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
+    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80',
     price: '$25.00',
     organizer: {
       name: 'Vibes Music',

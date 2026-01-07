@@ -6,7 +6,7 @@ import { COLORS, FONTS, SIZES } from '../constants/theme';
 import { EVENTS, CATEGORIES } from '../assets/data';
 import EventCard from '../components/EventCard';
 import CategoryPill from '../components/CategoryPill';
-import { Search, Bell } from 'lucide-react-native';
+import { Search, Bell, SlidersHorizontal } from 'lucide-react-native';
 import * as Icons from 'lucide-react-native';
 
 export default function HomeScreen({ navigation }) {
@@ -19,32 +19,45 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.greeting}>Hola, Guido 👋</Text>
         <Text style={styles.subtitle}>Descubre eventos increíbles</Text>
       </View>
-      <TouchableOpacity style={styles.notificationButton}>
+      {/* <TouchableOpacity style={styles.notificationButton}>
         <Bell size={24} color={COLORS.text} />
         <View style={styles.badge} />
+      </TouchableOpacity> */}
+
+      <TouchableOpacity style={styles.profileBtn}>
+        <Image
+          source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80' }}
+          style={styles.profileImage}
+        />
       </TouchableOpacity>
     </View>
   );
 
   const renderSearchBar = () => (
-    <View style={styles.searchContainer}>
-      <Search size={20} color={COLORS.textSecondary} style={styles.searchIcon} />
-      <TextInput
-        placeholder="Buscar eventos, conciertos..."
-        style={styles.searchInput}
-        placeholderTextColor={COLORS.textSecondary}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+    <View style={styles.searchSection}>
+      <View style={styles.searchContainer}>
+        <Search size={20} color={COLORS.textSecondary} style={styles.searchIcon} />
+        <TextInput
+          placeholder="Buscar eventos, conciertos..."
+          style={styles.searchInput}
+          placeholderTextColor={COLORS.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
+      <TouchableOpacity style={styles.filterBtn}>
+        <SlidersHorizontal size={20} color="#FFF" />
+      </TouchableOpacity>
     </View>
   );
 
   const renderCategories = () => (
     <View style={styles.categoriesContainer}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
-        <CategoryPill 
-          name="Todo" 
-          isSelected={selectedCategory === null} 
+        <CategoryPill
+          name="Todo"
+          isSelected={selectedCategory === null}
           onPress={() => setSelectedCategory(null)}
         />
         {CATEGORIES.map((cat) => {
@@ -71,8 +84,8 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.seeAll}>Ver todo</Text>
         </TouchableOpacity>
       </View>
-      <EventCard 
-        event={EVENTS[0]} 
+      <EventCard
+        event={EVENTS[0]}
         onPress={() => navigation.navigate('EventDetail', { event: EVENTS[0] })}
       />
     </View>
@@ -84,9 +97,9 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.sectionTitle}>Próximos Eventos</Text>
       </View>
       {EVENTS.slice(1).map((event) => (
-        <EventCard 
+        <EventCard
           key={event.id}
-          event={event} 
+          event={event}
           layout="horizontal"
           onPress={() => navigation.navigate('EventDetail', { event })}
         />
@@ -102,7 +115,7 @@ export default function HomeScreen({ navigation }) {
         {renderCategories()}
         {renderFeatured()}
         {renderNearby()}
-        <View style={{ height: 100 }} /> 
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -131,6 +144,16 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 14,
   },
+  profileBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
   notificationButton: {
     width: 45,
     height: 45,
@@ -150,16 +173,30 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: COLORS.secondary,
   },
+  searchSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SIZES.l,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
     paddingHorizontal: SIZES.m,
     paddingVertical: SIZES.s,
     borderRadius: SIZES.radius,
-    marginBottom: SIZES.l,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  filterBtn: {
+    width: 40,
+    height: 40,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
   },
   searchIcon: {
     marginRight: SIZES.s,

@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar, Clock, XCircle, CalendarDays } from 'lucide-react-native';
+import { Calendar, Clock, XCircle, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { format, addDays, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { MY_APPOINTMENTS, PROFESSIONALS } from '../constants/mockData';
+import VerticalAgenda from '../components/VerticalAgenda';
+import ViewModeToggle from '../components/ViewModeToggle';
+import Button from '../components/Button';
+import CustomCalendar from '../components/CustomCalendar';
 
 export default function AppointmentsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const [appointments, setAppointments] = useState(MY_APPOINTMENTS);
+  const [viewMode, setViewMode] = useState('list');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   useEffect(() => {
     if (route.params?.updatedAppointmentId && route.params?.newStatus) {
@@ -54,6 +63,15 @@ export default function AppointmentsScreen({ navigation, route }) {
       default: return { text: status, color: COLORS.light.textSecondary, bg: '#F2F2F7' };
     }
   };
+
+  const appointmentsForDate = useMemo(() => {
+    return appointments.filter(a => a.date.startsWith(selectedDate)).map(a => ({
+        ...a,
+        startTime: a.date.split('T')[1].substring(0, 5),
+        endTime: a.endTime || '11:00', // Mock duration
+        color: getStatusInfo(a.status).color
+    }));
+  }, [appointments, selectedDate]);
 
   const renderAppointment = ({ item }) => {
     const professional = getProfessional(item.professionalId);
@@ -112,15 +130,59 @@ export default function AppointmentsScreen({ navigation, route }) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.headerContainer}>
-        <Text style={styles.title}>Mis Turnos</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.title}>Mis Turnos</Text>
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+        </View>
       </View>
 
-      <FlatList
-        data={appointments}
-        keyExtractor={item => item.id}
-        renderItem={renderAppointment}
-        contentContainerStyle={styles.listContent}
-      />
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <View style={{ paddingHorizontal: SPACING.m, marginBottom: SPACING.m }}>
+            <CustomCalendar 
+                selectedDate={selectedDate} 
+                onSelectDate={setSelectedDate}
+            />
+        </View>
+
+        {viewMode === 'list' ? (
+            <View style={styles.listContent}>
+                {appointments.map(item => (
+                    <View key={item.id} style={{ marginBottom: SPACING.m }}>
+                        {renderAppointment({ item })}
+                    </View>
+                ))}
+            </View>
+        ) : (
+            <View style={{ flex: 1 }}>
+                <VerticalAgenda 
+                    selectedTime={null}
+                    onSelectTime={() => {}}
+                    onAppointmentPress={setSelectedAppointment}
+                    appointments={appointmentsForDate}
+                    scrollable={false}
+                />
+            </View>
+        )}
+      </ScrollView>
+
+      <Modal
+        visible={!!selectedAppointment}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedAppointment(null)}
+      >
+        <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+                {selectedAppointment && renderAppointment({ item: selectedAppointment })}
+                <Button 
+                    title="Cerrar" 
+                    variant="outline" 
+                    onPress={() => setSelectedAppointment(null)} 
+                    style={{ marginTop: SPACING.m }}
+                />
+            </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -218,5 +280,14 @@ const styles = StyleSheet.create({
   actionText: {
     fontWeight: '600',
     fontSize: 14,
+  },
+  modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      padding: SPACING.m,
+  },
+  modalContent: {
+      backgroundColor: 'transparent',
   }
 });

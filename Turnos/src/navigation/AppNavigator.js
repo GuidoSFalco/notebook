@@ -8,6 +8,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ProfessionalValidationScreen from '../screens/ProfessionalValidationScreen';
 import RescheduleScreen from '../screens/RescheduleScreen';
+import ProposeDateScreen from '../screens/ProposeDateScreen';
 import { COLORS } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
@@ -76,6 +77,16 @@ export default function AppNavigator() {
                 presentation: 'modal',
                 headerShown: true,
                 title: 'Cambiar Turno',
+                headerBackTitle: 'Cerrar',
+              }}
+            />
+            <Stack.Screen 
+              name="ProposeDate" 
+              component={ProposeDateScreen} 
+              options={{
+                presentation: 'modal',
+                headerShown: true,
+                title: 'Proponer Alternativa',
                 headerBackTitle: 'Cerrar',
               }}
             />

@@ -23,7 +23,9 @@ export default function CustomCalendar({
   onSelectDate, 
   originalDate, 
   availableDates = [], 
-  blockedDates = [] 
+  blockedDates = [],
+  multiSelect = false,
+  selectedDates = []
 }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
@@ -98,10 +100,15 @@ export default function CustomCalendar({
       <View style={styles.calendarBody}>
         {calendarDays.map((date, index) => {
           const dateString = format(date, dateFormat);
+          
           // Compare strings directly to avoid timezone issues with new Date('YYYY-MM-DD') which defaults to UTC
-          const isSelected = selectedDate === dateString;
+          const isSelected = multiSelect 
+            ? selectedDates.includes(dateString)
+            : selectedDate === dateString;
+            
           const isOriginal = originalDate === dateString;
           const isCurrentMonth = isSameMonth(date, currentMonth);
+          const isToday = isSameDay(date, today);
           const isPast = isBefore(date, today);
           
           // Check availability
@@ -132,6 +139,9 @@ export default function CustomCalendar({
           } else if (isOriginal) {
             containerStyle.push(styles.originalContainer);
             textStyle.push(styles.originalText);
+          } else if (isToday) {
+            containerStyle.push(styles.todayContainer);
+            textStyle.push(styles.todayText);
           } else if (isDisabled) {
              textStyle.push(styles.disabledText);
           }
@@ -242,11 +252,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   originalContainer: {
-    borderWidth: 2,
-    borderColor: COLORS.warning,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: 'transparent',
   },
   originalText: {
-    color: COLORS.light.text,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  todayContainer: {
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.light.background,
+  },
+  todayText: {
+    color: COLORS.primary,
     fontWeight: '700',
   },
   originalDot: {

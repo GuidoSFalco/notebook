@@ -84,40 +84,111 @@ export const PROFESSIONALS = [
 ];
 
 export const MY_APPOINTMENTS = [
+  // HOY (2026-01-06)
   {
     id: 'a1',
     professionalId: 'p1',
-    date: '2025-12-28T10:00:00',
-    status: 'confirmed', // confirmed, cancelled, completed, reschedule_requested, cancellation_requested
-    service: 'Consulta General',
-    clientName: 'Guido Cliente',
-    clientPhone: '5491155556666'
+    date: '2026-01-06T09:00:00',
+    status: 'confirmed',
+    service: 'Consulta Cardiológica',
+    clientName: 'Juan Pérez',
+    clientPhone: '5491133334444'
   },
   {
     id: 'a2',
-    professionalId: 'p2',
-    date: '2025-12-15T16:30:00',
+    professionalId: 'p1',
+    date: '2026-01-06T11:30:00',
     status: 'completed',
+    service: 'Control Presión Arterial',
+    clientName: 'María Gómez',
+    clientPhone: '5491155556666'
+  },
+  {
+    id: 'a3',
+    professionalId: 'p1',
+    date: '2026-01-06T14:00:00',
+    status: 'reschedule_requested',
+    service: 'Consulta Urgencia',
+    clientName: 'Carlos López',
+    clientPhone: '5491166667777',
+    endTime: '15:00'
+  },
+  {
+    id: 'a4',
+    professionalId: 'p1',
+    date: '2026-01-06T16:15:00',
+    status: 'cancellation_requested',
+    service: 'Chequeo General',
+    clientName: 'Ana Díaz',
+    clientPhone: '5491188889999'
+  },
+  {
+    id: 'a5',
+    professionalId: 'p1',
+    date: '2026-01-06T18:00:00',
+    status: 'confirmed',
+    service: 'Entrega de Estudios',
+    clientName: 'Pedro Silva',
+    clientPhone: '5491122223333'
+  },
+
+  // MAÑANA (2026-01-07)
+  {
+    id: 'a6',
+    professionalId: 'p1',
+    date: '2026-01-07T10:00:00',
+    status: 'confirmed',
+    service: 'Ergometría',
+    clientName: 'Lucía Fernández',
+    clientPhone: '5491144445555'
+  },
+  {
+    id: 'a7',
+    professionalId: 'p1',
+    date: '2026-01-07T15:00:00',
+    status: 'proposal_sent',
+    service: 'Consulta General',
+    clientName: 'Miguel Torres',
+    clientPhone: '5491199990000'
+  },
+
+  // AYER (2026-01-05)
+  {
+    id: 'a8',
+    professionalId: 'p1',
+    date: '2026-01-05T09:00:00',
+    status: 'completed',
+    service: 'Consulta Primera Vez',
+    clientName: 'Sofía Ramirez',
+    clientPhone: '5491177778888'
+  },
+  {
+    id: 'a9',
+    professionalId: 'p1',
+    date: '2026-01-05T11:00:00',
+    status: 'cancelled',
+    service: 'Control',
+    clientName: 'Diego Ruiz',
+    clientPhone: '5491111112222'
+  },
+
+  // OTROS PROFESIONALES (Para no romper otras vistas si se usan)
+  {
+    id: 'a10',
+    professionalId: 'p2',
+    date: '2026-01-06T16:30:00',
+    status: 'confirmed',
     service: 'Sesión de Terapia',
     clientName: 'Guido Cliente',
     clientPhone: '5491155556666'
   },
   {
-    id: 'a3',
+    id: 'a11',
     professionalId: 'p3',
-    date: '2025-12-30T14:00:00',
+    date: '2026-01-08T14:00:00',
     status: 'reschedule_requested',
     service: 'Limpieza Dental',
     clientName: 'Ana Perez',
     clientPhone: '5491144443333'
-  },
-  {
-    id: 'a4',
-    professionalId: 'p4',
-    date: '2026-01-05T09:00:00',
-    status: 'cancellation_requested',
-    service: 'Plan Nutricional',
-    clientName: 'Carlos Ruiz',
-    clientPhone: '5491122221111'
   }
 ];

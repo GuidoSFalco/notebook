@@ -6,12 +6,12 @@ import { es } from 'date-fns/locale';
 import { Calendar, Clock, CheckCircle } from 'lucide-react-native';
 import Button from '../components/Button';
 import CustomCalendar from '../components/CustomCalendar';
+import VerticalAgenda from '../components/VerticalAgenda';
+import { MY_APPOINTMENTS } from '../constants/mockData';
+import { generateTimeSlots } from '../utils/timeUtils';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
-const TIME_SLOTS = [
-  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
-];
+const TIME_SLOTS = generateTimeSlots(15, 9, 18);
 
 export default function BookingScreen() {
   const route = useRoute();
@@ -19,7 +19,7 @@ export default function BookingScreen() {
   const { professional } = route.params;
 
   const [step, setStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState(professional.availability[0]);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
 
   const handleConfirm = () => {
@@ -38,6 +38,20 @@ export default function BookingScreen() {
     );
   };
 
+  const getProfessionalAppointments = (date) => {
+      if (!date) return [];
+      return MY_APPOINTMENTS.filter(a => 
+         a.professionalId === professional.id && 
+         a.date.startsWith(date)
+      ).map(a => ({
+         startTime: a.date.split('T')[1].substring(0, 5),
+         endTime: '11:00', // Mock duration
+         status: 'Ocupado',
+         clientName: 'Reservado',
+         color: COLORS.light.border
+      }));
+  };
+
   const renderStep1 = () => (
     <View>
       <Text style={styles.stepTitle}>Seleccioná una fecha</Text>
@@ -53,18 +67,18 @@ export default function BookingScreen() {
         />
       </View>
 
-      <Text style={styles.stepTitle}>Seleccioná un horario</Text>
-      <View style={styles.timeGrid}>
-        {TIME_SLOTS.map((time) => (
-          <Button
-            key={time}
-            title={time}
-            onPress={() => setSelectedTime(time)}
-            variant={selectedTime === time ? 'primary' : 'outline'}
-            style={styles.timeButton}
-          />
-        ))}
-      </View>
+      {selectedDate && (
+        <>
+            <Text style={styles.stepTitle}>Seleccioná un horario</Text>
+            <VerticalAgenda 
+                selectedTime={selectedTime}
+                onSelectTime={setSelectedTime}
+                appointments={getProfessionalAppointments(selectedDate)}
+                scrollable={true}
+                height={400}
+            />
+        </>
+      )}
     </View>
   );
 

@@ -1,44 +1,73 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ScrollView, TextInput } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Calendar, Clock, Filter, Check, X, Phone, ArrowRight, CalendarDays } from 'lucide-react-native';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { MY_APPOINTMENTS } from '../constants/mockData';
 import Button from '../components/Button';
+import VerticalAgenda from '../components/VerticalAgenda';
+import ViewModeToggle from '../components/ViewModeToggle';
+import CustomCalendar from '../components/CustomCalendar';
 
 // Mock logged in professional ID
 const CURRENT_PROFESSIONAL_ID = 'p1'; 
 
 export default function ProfessionalAppointmentsScreen() {
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [appointments, setAppointments] = useState(
     MY_APPOINTMENTS.filter(a => a.professionalId === CURRENT_PROFESSIONAL_ID || true) // Show all for demo purposes if p1 has few
   ); 
   const [filterStatus, setFilterStatus] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [viewMode, setViewMode] = useState('agenda'); // 'agenda' | 'list'
   const [selectedAppointment, setSelectedAppointment] = useState(null);
-  const [proposalData, setProposalData] = useState({
-      startDate: '',
-      endDate: '',
-      startTime: '',
-      endTime: ''
-  });
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const filteredAppointments = appointments.filter(item => {
-      if (filterStatus === 'all') return true;
-      if (filterStatus === 'pending_action') {
-          return item.status === 'reschedule_requested' || item.status === 'cancellation_requested';
+  const getStatusBadge = (status) => {
+      switch (status) {
+          case 'confirmed': return { text: 'Confirmado', color: COLORS.success, bg: '#E8F5E9' };
+          case 'reschedule_requested': return { text: 'Solicitud de Cambio', color: COLORS.warning, bg: '#FFF3E0' };
+          case 'cancellation_requested': return { text: 'Solicitud de Cancelación', color: COLORS.error, bg: '#FFEBEE' };
+          case 'cancelled': return { text: 'Cancelado', color: COLORS.light.textSecondary, bg: '#F2F2F7' };
+          case 'completed': return { text: 'Finalizado', color: COLORS.primary, bg: '#E3F2FD' };
+          case 'proposal_sent': return { text: 'Propuesta Enviada', color: COLORS.secondary, bg: '#E8EAF6' };
+          default: return { text: status, color: COLORS.light.textSecondary, bg: '#F2F2F7' };
       }
-      return item.status === filterStatus;
-  }).sort((a, b) => new Date(a.date) - new Date(b.date));
+  };
+
+  const appointmentsForDate = useMemo(() => {
+    return appointments.filter(a => {
+        if (!a.date.startsWith(selectedDate)) return false;
+        if (filterStatus === 'all') return true;
+        if (filterStatus === 'pending_action') {
+            return a.status === 'reschedule_requested' || a.status === 'cancellation_requested';
+        }
+        return a.status === filterStatus;
+    }).map(a => ({
+        ...a,
+        startTime: a.date.split('T')[1].substring(0, 5),
+        endTime: a.endTime || '11:00', // Mock duration if not present
+        color: getStatusBadge(a.status).color
+    }));
+  }, [appointments, selectedDate, filterStatus]);
 
   const handleAction = (id, action, type) => {
       if (action === 'propose') {
           const appointment = appointments.find(a => a.id === id);
           setSelectedAppointment(appointment);
-          setShowProposalModal(true);
+          navigation.navigate('ProposeDate', {
+            appointment,
+            onProposalSent: (dates) => {
+                setAppointments(prev => prev.map(a => {
+                    if (a.id !== id) return a;
+                    return { ...a, status: 'proposal_sent' };
+                }));
+            }
+          });
           return;
       }
 
@@ -63,39 +92,18 @@ export default function ProfessionalAppointmentsScreen() {
                           
                           return { ...a, status: newStatus };
                       }));
+                      setSelectedAppointment(null);
                   }
               }
           ]
       );
   };
 
-  const sendProposal = () => {
-      setAppointments(prev => prev.map(a => {
-          if (a.id !== selectedAppointment.id) return a;
-          return { ...a, status: 'proposal_sent' };
-      }));
-      setShowProposalModal(false);
-      Alert.alert('Propuesta Enviada', 'Se ha enviado la propuesta alternativa al cliente.');
-  };
-
-  const getStatusBadge = (status) => {
-      switch (status) {
-          case 'confirmed': return { text: 'Confirmado', color: COLORS.success, bg: '#E8F5E9' };
-          case 'reschedule_requested': return { text: 'Solicitud de Cambio', color: COLORS.warning, bg: '#FFF3E0' };
-          case 'cancellation_requested': return { text: 'Solicitud de Cancelación', color: COLORS.error, bg: '#FFEBEE' };
-          case 'cancelled': return { text: 'Cancelado', color: COLORS.light.textSecondary, bg: '#F2F2F7' };
-          case 'completed': return { text: 'Finalizado', color: COLORS.primary, bg: '#E3F2FD' };
-          case 'proposal_sent': return { text: 'Propuesta Enviada', color: COLORS.secondary, bg: '#E8EAF6' };
-          default: return { text: status, color: COLORS.light.textSecondary, bg: '#F2F2F7' };
-      }
-  };
-
-  const renderItem = ({ item }) => {
+  const renderAppointmentDetails = (item) => {
+    if (!item) return null;
     const badge = getStatusBadge(item.status);
     const isPendingAction = item.status.includes('requested');
     const isReschedule = item.status === 'reschedule_requested';
-    
-    // Simulate requested date for demo if not present
     const requestedDate = isReschedule ? format(addDays(new Date(item.date), 2), "yyyy-MM-dd'T'10:00:00") : null;
 
     return (
@@ -160,7 +168,9 @@ export default function ProfessionalAppointmentsScreen() {
                 <View style={styles.buttonsRow}>
                     <TouchableOpacity 
                         style={[styles.actionButton, styles.rejectButton]}
-                        onPress={() => handleAction(item.id, 'reject', isReschedule ? 'reschedule' : 'cancellation')}
+                        onPress={() => {
+                            handleAction(item.id, 'reject', isReschedule ? 'reschedule' : 'cancellation');
+                        }}
                     >
                         <X size={20} color={COLORS.error} />
                         <Text style={[styles.actionText, { color: COLORS.error }]}>Rechazar</Text>
@@ -169,7 +179,9 @@ export default function ProfessionalAppointmentsScreen() {
                     {isReschedule && (
                         <TouchableOpacity 
                             style={[styles.actionButton, styles.proposalButton]}
-                            onPress={() => handleAction(item.id, 'propose', 'reschedule')}
+                            onPress={() => {
+                                handleAction(item.id, 'propose', 'reschedule');
+                            }}
                         >
                             <CalendarDays size={20} color={COLORS.secondary} />
                             <Text style={[styles.actionText, { color: COLORS.secondary }]}>Proponer</Text>
@@ -178,7 +190,9 @@ export default function ProfessionalAppointmentsScreen() {
 
                     <TouchableOpacity 
                         style={[styles.actionButton, styles.acceptButton]}
-                        onPress={() => handleAction(item.id, 'accept', isReschedule ? 'reschedule' : 'cancellation')}
+                        onPress={() => {
+                            handleAction(item.id, 'accept', isReschedule ? 'reschedule' : 'cancellation');
+                        }}
                     >
                         <Check size={20} color={COLORS.success} />
                         <Text style={[styles.actionText, { color: COLORS.success }]}>Aceptar</Text>
@@ -186,7 +200,42 @@ export default function ProfessionalAppointmentsScreen() {
                 </View>
             </View>
         )}
+        
+        <Button 
+            title="Cerrar" 
+            variant="outline" 
+            onPress={() => setSelectedAppointment(null)} 
+            style={{ marginTop: SPACING.m }}
+        />
       </View>
+    );
+  };
+
+  const renderListItem = ({ item }) => {
+    const badge = getStatusBadge(item.status);
+    return (
+      <TouchableOpacity 
+        style={[styles.card, { borderLeftColor: badge.color }]}
+        onPress={() => setSelectedAppointment(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardHeader}>
+            <View>
+                <Text style={styles.clientName}>{item.clientName || 'Cliente Anónimo'}</Text>
+                <Text style={styles.service}>{item.service}</Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+                <Text style={[styles.badgeText, { color: badge.color }]}>{badge.text}</Text>
+            </View>
+        </View>
+
+        <View style={styles.infoContainer}>
+            <View style={styles.infoRow}>
+                <Clock size={16} color={COLORS.light.textSecondary} />
+                <Text style={styles.infoText}>{item.startTime} - {item.endTime}</Text>
+            </View>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -194,9 +243,12 @@ export default function ProfessionalAppointmentsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Agenda Profesional</Text>
-        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(!showFilters)}>
-            <Filter size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: SPACING.s, alignItems: 'center' }}>
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+            <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(!showFilters)}>
+                <Filter size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+        </View>
       </View>
 
       {showFilters && (
@@ -222,82 +274,55 @@ export default function ProfessionalAppointmentsScreen() {
           </View>
       )}
 
-      <FlatList 
-        data={filteredAppointments}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-            <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No hay turnos para mostrar</Text>
-            </View>
-        }
-      />
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        {/* Date Navigation */}
+        <View style={{ paddingHorizontal: SPACING.m, marginBottom: SPACING.m }}>
+          <CustomCalendar 
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+          />
+        </View>
+
+        <View style={styles.agendaContainer}>
+          {viewMode === 'agenda' ? (
+              <VerticalAgenda 
+                  selectedTime={null}
+                  onSelectTime={() => {}}
+                  onAppointmentPress={setSelectedAppointment}
+                  appointments={appointmentsForDate}
+                  scrollable={false}
+              />
+          ) : (
+              <View style={styles.listContent}>
+                  {appointmentsForDate.length > 0 ? (
+                      appointmentsForDate.map(item => (
+                          <View key={item.id} style={{ marginBottom: SPACING.m }}>
+                              {renderListItem({ item })}
+                          </View>
+                      ))
+                  ) : (
+                      <View style={styles.emptyState}>
+                          <Text style={styles.emptyText}>No hay turnos para esta fecha</Text>
+                      </View>
+                  )}
+              </View>
+          )}
+        </View>
+      </ScrollView>
 
       <Modal
-        visible={showProposalModal}
-        animationType="slide"
+        visible={!!selectedAppointment}
         transparent={true}
-        onRequestClose={() => setShowProposalModal(false)}
+        animationType="fade"
+        onRequestClose={() => setSelectedAppointment(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Proponer Alternativa</Text>
-            <Text style={styles.modalSubtitle}>Sugiere un nuevo rango de fechas y horarios</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Rango de Fechas</Text>
-              <View style={styles.row}>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Inicio (YYYY-MM-DD)"
-                  value={proposalData.startDate}
-                  onChangeText={(text) => setProposalData(prev => ({...prev, startDate: text}))}
-                />
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Fin (YYYY-MM-DD)"
-                  value={proposalData.endDate}
-                  onChangeText={(text) => setProposalData(prev => ({...prev, endDate: text}))}
-                />
-              </View>
+            <View style={styles.modalContent}>
+                {renderAppointmentDetails(selectedAppointment)}
             </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Rango Horario</Text>
-              <View style={styles.row}>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Inicio (HH:MM)"
-                  value={proposalData.startTime}
-                  onChangeText={(text) => setProposalData(prev => ({...prev, startTime: text}))}
-                />
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Fin (HH:MM)"
-                  value={proposalData.endTime}
-                  onChangeText={(text) => setProposalData(prev => ({...prev, endTime: text}))}
-                />
-              </View>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.rejectButton]}
-                onPress={() => setShowProposalModal(false)}
-              >
-                <Text style={[styles.actionText, { color: COLORS.error }]}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={sendProposal}
-              >
-                <Text style={[styles.actionText, { color: COLORS.success }]}>Enviar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       </Modal>
+
     </View>
   );
 }
@@ -438,56 +463,6 @@ const styles = StyleSheet.create({
       backgroundColor: '#E8EAF6',
       borderColor: '#E8EAF6',
   },
-  modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      padding: SPACING.l,
-  },
-  modalContent: {
-      backgroundColor: COLORS.light.card,
-      borderRadius: RADIUS.l,
-      padding: SPACING.l,
-      ...SHADOWS.medium,
-  },
-  modalTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      marginBottom: SPACING.xs,
-      textAlign: 'center',
-  },
-  modalSubtitle: {
-      fontSize: 14,
-      color: COLORS.light.textSecondary,
-      marginBottom: SPACING.l,
-      textAlign: 'center',
-  },
-  inputGroup: {
-      marginBottom: SPACING.m,
-  },
-  inputLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-      marginBottom: SPACING.s,
-      color: COLORS.light.text,
-  },
-  row: {
-      flexDirection: 'row',
-      gap: SPACING.s,
-  },
-  input: {
-      flex: 1,
-      height: 44,
-      borderWidth: 1,
-      borderColor: COLORS.light.border,
-      borderRadius: RADIUS.m,
-      paddingHorizontal: SPACING.m,
-      backgroundColor: COLORS.light.background,
-  },
-  modalActions: {
-      flexDirection: 'row',
-      marginTop: SPACING.l,
-  },
   actionText: {
       fontWeight: '600',
       fontSize: 14,
@@ -500,4 +475,16 @@ const styles = StyleSheet.create({
       color: COLORS.light.textSecondary,
       fontSize: 16,
   },
+  agendaContainer: {
+      flex: 1,
+  },
+  modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      padding: SPACING.m,
+  },
+  modalContent: {
+      backgroundColor: 'transparent',
+  }
 });
