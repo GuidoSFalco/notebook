@@ -1,10 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, Platform, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, Platform, Dimensions, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Star, MapPin, Clock, DollarSign, Award, ThumbsUp, Calendar } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import ProfessionalService from '../services/professional.service';
 
 const { width } = Dimensions.get('window');
 
@@ -12,7 +15,26 @@ export default function ProfessionalDetailScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { professional } = route.params;
+  const { professional: initialProfessional } = route.params;
+  const [professional, setProfessional] = useState(initialProfessional);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDetails();
+  }, []);
+
+  const loadDetails = async () => {
+    try {
+      const data = await ProfessionalService.getById(initialProfessional.id);
+      // Merge initial data with detailed data if needed, or just set data
+      // Assuming data is the full object
+      setProfessional(data);
+    } catch (e) {
+      console.error('Error loading professional details', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderFeature = (icon, title, value) => (
     <View style={styles.featureItem}>
@@ -26,12 +48,14 @@ export default function ProfessionalDetailScreen() {
     </View>
   );
 
+  if (!professional) return null;
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false}>
         {/* Header Visual */}
         <View style={styles.headerImageContainer}>
-            <Image source={{ uri: professional.image }} style={styles.headerImage} />
+            <Image source={{ uri: professional.image || 'https://via.placeholder.com/400' }} style={styles.headerImage} />
             <View style={styles.headerOverlay} />
             <View style={[styles.headerContent, { paddingTop: insets.top + SPACING.l }]}>
                 <View style={styles.badge}>
@@ -77,7 +101,7 @@ export default function ProfessionalDetailScreen() {
         {/* About Section */}
         <View style={styles.section}>
             <Text style={styles.sectionTitle}>Sobre mí</Text>
-            <Text style={styles.aboutText}>{professional.about}</Text>
+            <Text style={styles.aboutText}>{professional.about || 'Sin descripción disponible.'}</Text>
         </View>
 
         {/* Availability Preview */}
@@ -87,38 +111,29 @@ export default function ProfessionalDetailScreen() {
                 <Calendar size={20} color={COLORS.primary} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datesScroll}>
-                {professional.availability.map((date, index) => (
-                    <View key={index} style={styles.dateCard}>
-                        <Text style={styles.dateDay}>{date.split('-')[2]}</Text>
-                        <Text style={styles.dateMonth}>DIC</Text>
-                    </View>
-                ))}
+                {professional.availability && professional.availability.map((dateStr, index) => {
+                    const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+                    const date = new Date(year, month - 1, day);
+                    return (
+                        <View key={index} style={styles.dateCard}>
+                            <Text style={styles.dateDay}>{day}</Text>
+                            <Text style={styles.dateMonth}>
+                                {format(date, 'MMM', { locale: es }).toUpperCase().replace('.', '')}
+                            </Text>
+                        </View>
+                    );
+                })}
             </ScrollView>
         </View>
-
-        {/* Additional Info */}
-        <View style={styles.section}>
-             <Text style={styles.sectionTitle}>Información</Text>
-             <View style={styles.featuresGrid}>
-                {renderFeature(<Clock size={20} color={COLORS.primary} />, 'Duración', '30 min')}
-                {renderFeature(<MapPin size={20} color={COLORS.primary} />, 'Modalidad', 'Presencial')}
-             </View>
-        </View>
-
       </ScrollView>
 
-      {/* Sticky Footer Action */}
-      <View style={[styles.footer, { paddingBottom: Math.max(SPACING.l, insets.bottom) }]}>
-        <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>Precio total</Text>
-            <Text style={styles.priceValue}>${professional.price}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-             <Button 
-                title="Reservar Turno" 
-                onPress={() => navigation.navigate('Booking', { professional })}
-            />
-        </View>
+      {/* Footer Actions */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + SPACING.m }]}>
+        <Button 
+            title="Reservar Turno" 
+            onPress={() => navigation.navigate('Booking', { professional })}
+            style={styles.bookButton}
+        />
       </View>
     </View>
   );
@@ -129,9 +144,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.light.background,
   },
+  scrollContent: {
+    paddingBottom: SPACING.xl,
+  },
   headerImageContainer: {
-    height: 340,
-    width: '100%',
+    height: 300,
+    width: width,
     position: 'relative',
   },
   headerImage: {
@@ -142,77 +160,77 @@ const styles = StyleSheet.create({
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
-    backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 100%)', // Web polyfill if needed, mostly for visual idea
+    backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.6))', // Note: linear-gradient not supported natively without library
   },
   headerContent: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: SPACING.l,
-    paddingBottom: SPACING.xl + 20, // Space for the floating card overlap
+    bottom: SPACING.xl,
+    left: SPACING.l,
+    right: SPACING.l,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: SPACING.s,
-    paddingVertical: 4,
-    borderRadius: RADIUS.s,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
     alignSelf: 'flex-start',
     marginBottom: SPACING.s,
-    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   badgeText: {
     color: '#FFF',
     fontSize: 12,
     fontWeight: '600',
+    marginLeft: SPACING.xs,
   },
   name: {
     fontSize: 28,
     fontWeight: '700',
     color: '#FFF',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   specialty: {
     fontSize: 18,
     color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
     marginBottom: SPACING.s,
   },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
   },
   location: {
+    color: 'rgba(255,255,255,0.9)',
+    marginLeft: SPACING.xs,
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
   },
   statsCard: {
     flexDirection: 'row',
     backgroundColor: COLORS.light.card,
-    marginHorizontal: SPACING.l,
-    marginTop: -30,
-    borderRadius: RADIUS.l,
+    margin: SPACING.l,
+    marginTop: -SPACING.xl,
     padding: SPACING.m,
+    borderRadius: RADIUS.l,
     ...SHADOWS.medium,
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statValueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     marginBottom: 4,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.light.text,
+    marginLeft: 4,
   },
   statLabel: {
     fontSize: 12,
@@ -224,43 +242,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.border,
   },
   section: {
-    marginTop: SPACING.xl,
     paddingHorizontal: SPACING.l,
-  },
-  cardSection: {
-    marginTop: SPACING.m,
-    marginHorizontal: SPACING.l,
-    backgroundColor: COLORS.light.card,
-    borderRadius: RADIUS.l,
-    padding: SPACING.m,
-    ...SHADOWS.light,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: SPACING.s,
-  },
-  contactItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contactText: {
-    fontSize: 12,
-    color: COLORS.light.textSecondary,
-    fontWeight: '500',
+    marginBottom: SPACING.xl,
   },
   sectionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: SPACING.m,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.m,
   },
   sectionTitle: {
     fontSize: 18,
@@ -269,91 +258,71 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.s,
   },
   aboutText: {
-    fontSize: 16,
-    color: COLORS.light.textSecondary,
+    fontSize: 15,
     lineHeight: 24,
-  },
-  featuresGrid: {
-      flexDirection: 'row',
-      gap: SPACING.l,
-  },
-  featureItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.m,
-      flex: 1,
-      backgroundColor: '#F8F9FA',
-      padding: SPACING.m,
-      borderRadius: RADIUS.m,
-  },
-  featureIconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: RADIUS.s,
-      backgroundColor: '#FFF',
-      justifyContent: 'center',
-      alignItems: 'center',
-      ...SHADOWS.light,
-  },
-  featureTitle: {
-      fontSize: 12,
-      color: COLORS.light.textSecondary,
-      marginBottom: 2,
-  },
-  featureValue: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: COLORS.light.text,
+    color: COLORS.light.textSecondary,
   },
   datesScroll: {
-      flexDirection: 'row',
+    marginHorizontal: -SPACING.l,
+    paddingHorizontal: SPACING.l,
   },
   dateCard: {
-      width: 60,
-      height: 70,
-      backgroundColor: COLORS.light.card,
-      borderRadius: RADIUS.m,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: SPACING.m,
-      borderWidth: 1,
-      borderColor: COLORS.light.border,
+    backgroundColor: COLORS.light.card,
+    padding: SPACING.m,
+    borderRadius: RADIUS.m,
+    alignItems: 'center',
+    marginRight: SPACING.m,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    minWidth: 70,
   },
   dateDay: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: COLORS.light.text,
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.light.text,
+    marginBottom: 2,
   },
   dateMonth: {
-      fontSize: 12,
-      color: COLORS.light.textSecondary,
-      textTransform: 'uppercase',
+    fontSize: 12,
+    color: COLORS.light.textSecondary,
+    fontWeight: '600',
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.m,
+  },
+  featureIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.m,
+    backgroundColor: COLORS.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.m,
+  },
+  featureTitle: {
+    fontSize: 14,
+    color: COLORS.light.textSecondary,
+    marginBottom: 2,
+  },
+  featureValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.light.text,
   },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.light.card,
-    padding: SPACING.l,
+    backgroundColor: COLORS.light.background,
+    paddingHorizontal: SPACING.l,
+    paddingTop: SPACING.m,
     borderTopWidth: 1,
     borderTopColor: COLORS.light.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.l,
-    ...SHADOWS.medium,
   },
-  priceContainer: {
-      minWidth: 100,
-  },
-  priceLabel: {
-      fontSize: 12,
-      color: COLORS.light.textSecondary,
-      marginBottom: 2,
-  },
-  priceValue: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: COLORS.light.text,
-  },
+  bookButton: {
+    width: '100%',
+  }
 });

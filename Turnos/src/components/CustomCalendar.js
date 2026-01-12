@@ -25,7 +25,8 @@ export default function CustomCalendar({
   availableDates = [], 
   blockedDates = [],
   multiSelect = false,
-  selectedDates = []
+  selectedDates = [],
+  occupancy = {} // { 'YYYY-MM-DD': 'full' | 'high' | 'medium' | 'low' }
 }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
@@ -79,6 +80,16 @@ export default function CustomCalendar({
     );
   };
 
+  const getOccupancyColor = (status) => {
+    switch (status) {
+      case 'full': return COLORS.error; // Ocupado / Lleno
+      case 'high': return COLORS.warning; // Casi lleno
+      case 'medium': return COLORS.secondary; // Disponibilidad parcial
+      case 'low': return COLORS.success; // Disponible
+      default: return 'transparent';
+    }
+  };
+
   const renderCells = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
@@ -129,6 +140,9 @@ export default function CustomCalendar({
           // Original date should always be enabled regardless of availability rules
           const isDisabled = !isCurrentMonth || (!isAvailable && !isOriginal);
 
+          const occupancyStatus = occupancy[dateString];
+          const occupancyColor = getOccupancyColor(occupancyStatus);
+
           let cellStyle = [styles.cell];
           let textStyle = [styles.cellText];
           let containerStyle = [styles.dayContainer];
@@ -156,6 +170,9 @@ export default function CustomCalendar({
               <View style={containerStyle}>
                 <Text style={textStyle}>{format(date, 'd')}</Text>
                 {isOriginal && !isSelected && <View style={styles.originalDot} />}
+                {!isSelected && !isDisabled && occupancyStatus && (
+                  <View style={[styles.occupancyDot, { backgroundColor: occupancyColor }]} />
+                )}
               </View>
             </TouchableOpacity>
           );
@@ -179,6 +196,29 @@ export default function CustomCalendar({
             <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: COLORS.warning }]} />
                 <Text style={styles.legendText}>Turno Actual</Text>
+            </View>
+        </View>
+      )}
+
+      {Object.keys(occupancy).length > 0 && (
+        <View style={[styles.legend, { marginTop: originalDate ? 0 : SPACING.m, borderTopWidth: originalDate ? 0 : 1 }]}>
+            <View style={styles.legendRow}>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: COLORS.error }]} />
+                    <Text style={styles.legendText}>Lleno</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: COLORS.warning }]} />
+                    <Text style={styles.legendText}>Alto</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: COLORS.secondary }]} />
+                    <Text style={styles.legendText}>Medio</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
+                    <Text style={styles.legendText}>Bajo</Text>
+                </View>
             </View>
         </View>
       )}
@@ -277,6 +317,13 @@ const styles = StyleSheet.create({
       borderRadius: 2,
       backgroundColor: COLORS.warning,
   },
+  occupancyDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
   disabledText: {
     color: COLORS.light.border,
   },
@@ -292,12 +339,23 @@ const styles = StyleSheet.create({
   legendItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.s,
+      marginRight: SPACING.m,
+      marginBottom: SPACING.xs,
   },
   legendDot: {
       width: 8,
       height: 8,
       borderRadius: 4,
+      marginRight: SPACING.s,
+  },
+  occupancyLegend: {
+      marginTop: SPACING.s,
+      width: '100%',
+  },
+  legendRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: SPACING.xs,
   },
   legendText: {
       fontSize: 12,

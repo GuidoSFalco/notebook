@@ -24,7 +24,8 @@ export default function LoginScreen({ navigation }) {
       await login(email, password);
       // Navigation is handled by AppNavigator listening to user state
     } catch (error) {
-      Alert.alert('Error', error.message);
+      const message = error.response?.data?.message || error.message || 'Error al iniciar sesión';
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }

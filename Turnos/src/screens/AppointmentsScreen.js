@@ -1,32 +1,70 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Clock, XCircle, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { format, addDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
-import { MY_APPOINTMENTS, PROFESSIONALS } from '../constants/mockData';
 import VerticalAgenda from '../components/VerticalAgenda';
 import ViewModeToggle from '../components/ViewModeToggle';
 import Button from '../components/Button';
 import CustomCalendar from '../components/CustomCalendar';
+import { formatDateES, formatTime } from '../utils/timeUtils';
+import AppointmentService from '../services/appointment.service';
+
+const STATUS_MAP = {
+  0: 'confirmed',
+  1: 'completed',
+  2: 'cancelled',
+  3: 'reschedule_requested',
+  4: 'cancellation_requested',
+  5: 'proposal_sent'
+};
 
 export default function AppointmentsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const [appointments, setAppointments] = useState(MY_APPOINTMENTS);
+  const [appointments, setAppointments] = useState([]);
   const [viewMode, setViewMode] = useState('list');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchAppointments = useCallback(async () => {
+    try {
+      const data = await AppointmentService.getMyAppointments();
+      const mappedData = data.map(appt => ({
+        ...appt,
+        status: typeof appt.status === 'number' ? STATUS_MAP[appt.status] || appt.status : appt.status,
+        service: appt.serviceType || appt.service || 'Consulta'
+      }));
+      setAppointments(mappedData);
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      // Alert.alert('Error', 'No se pudieron cargar los turnos');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   useEffect(() => {
     if (route.params?.updatedAppointmentId && route.params?.newStatus) {
-        updateStatus(route.params.updatedAppointmentId, route.params.newStatus);
-        // Clear params to avoid double update if needed, though simpler just to leave it
+        // Refresh data to ensure consistency
+        fetchAppointments();
+        // Clear params
         navigation.setParams({ updatedAppointmentId: null, newStatus: null });
     }
-  }, [route.params]);
+  }, [route.params, fetchAppointments]);
 
-  const getProfessional = (id) => PROFESSIONALS.find(p => p.id === id);
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAppointments();
+  };
 
   const handleCancelRequest = (id) => {
     Alert.alert(
@@ -37,20 +75,24 @@ export default function AppointmentsScreen({ navigation, route }) {
         { 
           text: "Sí, cancelar", 
           style: "destructive",
-          onPress: () => updateStatus(id, 'cancellation_requested')
+          onPress: async () => {
+            try {
+               // 4 = Cancellation Requested
+               await AppointmentService.updateStatus(id, 4);
+               fetchAppointments();
+            } catch (error) {
+               console.error('Error cancelling:', error);
+               Alert.alert('Error', 'No se pudo cancelar el turno');
+            }
+          }
         }
       ]
     );
   };
 
+
   const handleRescheduleRequest = (appointment) => {
     navigation.navigate('Reschedule', { appointment });
-  };
-
-  const updateStatus = (id, newStatus) => {
-    setAppointments(prev => prev.map(appt => 
-      appt.id === id ? { ...appt, status: newStatus } : appt
-    ));
   };
 
   const getStatusInfo = (status) => {
@@ -64,6 +106,25 @@ export default function AppointmentsScreen({ navigation, route }) {
     }
   };
 
+  const occupancy = useMemo(() => {
+    const counts = {};
+    appointments.forEach(app => {
+        if (app.status !== 'cancelled') {
+            const date = app.date.split('T')[0];
+            counts[date] = (counts[date] || 0) + 1;
+        }
+    });
+
+    const result = {};
+    Object.keys(counts).forEach(date => {
+        const count = counts[date];
+        if (count >= 3) result[date] = 'high';
+        else if (count === 2) result[date] = 'medium';
+        else result[date] = 'low';
+    });
+    return result;
+  }, [appointments]);
+
   const appointmentsForDate = useMemo(() => {
     return appointments.filter(a => a.date.startsWith(selectedDate)).map(a => ({
         ...a,
@@ -74,8 +135,7 @@ export default function AppointmentsScreen({ navigation, route }) {
   }, [appointments, selectedDate]);
 
   const renderAppointment = ({ item }) => {
-    const professional = getProfessional(item.professionalId);
-    if (!professional) return null;
+    const professionalName = item.professional?.name || item.professionalName || 'Profesional';
 
     const statusInfo = getStatusInfo(item.status);
     const isActionable = item.status === 'confirmed';
@@ -91,7 +151,7 @@ export default function AppointmentsScreen({ navigation, route }) {
             </View>
         </View>
 
-        <Text style={styles.professionalName}>{professional.name}</Text>
+        <Text style={styles.professionalName}>{professionalName}</Text>
         
         <View style={styles.dateTimeContainer}>
             <View style={styles.infoRow}>
@@ -136,21 +196,39 @@ export default function AppointmentsScreen({ navigation, route }) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : (
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 100 }} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={{ paddingHorizontal: SPACING.m, marginBottom: SPACING.m }}>
             <CustomCalendar 
                 selectedDate={selectedDate} 
                 onSelectDate={setSelectedDate}
+                occupancy={occupancy}
             />
         </View>
 
         {viewMode === 'list' ? (
             <View style={styles.listContent}>
-                {appointments.map(item => (
-                    <View key={item.id} style={{ marginBottom: SPACING.m }}>
-                        {renderAppointment({ item })}
+                {appointmentsForDate.length > 0 ? (
+                    appointmentsForDate.map(item => (
+                        <View key={item.id} style={{ marginBottom: SPACING.m }}>
+                            {renderAppointment({ item })}
+                        </View>
+                    ))
+                ) : (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>No tenés turnos para esta fecha</Text>
                     </View>
-                ))}
+                )}
             </View>
         ) : (
             <View style={{ flex: 1 }}>
@@ -164,6 +242,7 @@ export default function AppointmentsScreen({ navigation, route }) {
             </View>
         )}
       </ScrollView>
+      )}
 
       <Modal
         visible={!!selectedAppointment}
@@ -289,5 +368,13 @@ const styles = StyleSheet.create({
   },
   modalContent: {
       backgroundColor: 'transparent',
+  },
+  emptyState: {
+      alignItems: 'center',
+      paddingTop: SPACING.xl,
+  },
+  emptyText: {
+      color: COLORS.light.textSecondary,
+      fontSize: 16,
   }
 });

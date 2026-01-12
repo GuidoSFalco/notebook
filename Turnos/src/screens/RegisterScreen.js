@@ -9,13 +9,14 @@ export default function RegisterScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { register } = useAuth();
   
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!email || !password || !confirmPassword) {
+    if (!fullName || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Por favor complete todos los campos');
       return;
     }
@@ -27,9 +28,10 @@ export default function RegisterScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await register(email, password);
+      await register(fullName, email, password, false);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      const message = error.response?.data?.message || error.message || 'Error al registrarse';
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
@@ -47,6 +49,18 @@ export default function RegisterScreen({ navigation }) {
         </View>
 
         <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Nombre Completo</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Juan Pérez"
+              placeholderTextColor={COLORS.light.textSecondary}
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+            />
+          </View>
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <TextInput

@@ -1,27 +1,61 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TextInput, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import { Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ProfessionalCard from '../components/ProfessionalCard';
 import CategoryChip from '../components/CategoryChip';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
-import { PROFESSIONALS, CATEGORIES } from '../constants/mockData';
+import ProfessionalService from '../services/professional.service';
+import { useAuth } from '../context/AuthContext';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
+  
+  const [professionals, setProfessionals] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredProfessionals = PROFESSIONALS.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.specialty.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory ? p.category === selectedCategory : true;
-    return matchesSearch && matchesCategory;
-  });
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadProfessionals();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedCategory]);
+
+  const loadCategories = async () => {
+    try {
+      const data = await ProfessionalService.getCategories();
+      setCategories(data);
+    } catch (e) {
+      console.error('Error loading categories', e);
+    }
+  };
+
+  const loadProfessionals = async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (searchQuery) params.name = searchQuery;
+      if (selectedCategory) params.category = selectedCategory;
+      const data = await ProfessionalService.getAll(params);
+      setProfessionals(data);
+    } catch (e) {
+      console.error('Error loading professionals', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      <Text style={styles.greeting}>Hola, Guido</Text>
+      <Text style={styles.greeting}>Hola, {user?.name || 'Usuario'}</Text>
       <Text style={styles.title}>Encontrá tu especialista</Text>
       
       <View style={styles.searchContainer}>
@@ -37,8 +71,8 @@ export default function HomeScreen({ navigation }) {
 
       <FlatList
         horizontal
-        data={CATEGORIES}
-        keyExtractor={item => item.id}
+        data={categories}
+        keyExtractor={item => item.id.toString()}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.categoriesContainer}
         renderItem={({ item }) => (
@@ -54,19 +88,26 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <FlatList
-        data={filteredProfessionals}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <ProfessionalCard 
-            professional={item} 
-            onPress={() => navigation.navigate('ProfessionalDetail', { professional: item })}
-          />
-        )}
-        ListHeaderComponent={renderHeader}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading && !professionals.length ? (
+         <View style={styles.loadingContainer}>
+            {renderHeader()}
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20 }} />
+         </View>
+      ) : (
+        <FlatList
+          data={professionals}
+          keyExtractor={item => item.id.toString()}
+          renderItem={({ item }) => (
+            <ProfessionalCard 
+              professional={item} 
+              onPress={() => navigation.navigate('ProfessionalDetail', { professional: item })}
+            />
+          )}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 }
@@ -98,8 +139,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.light.card,
     borderRadius: RADIUS.m,
-    paddingHorizontal: SPACING.m,
-    height: 50,
+    padding: SPACING.s,
     marginBottom: SPACING.m,
     borderWidth: 1,
     borderColor: COLORS.light.border,
@@ -111,6 +151,9 @@ const styles = StyleSheet.create({
     color: COLORS.light.text,
   },
   categoriesContainer: {
-    paddingRight: SPACING.m,
+    gap: SPACING.s,
   },
+  loadingContainer: {
+    padding: SPACING.m,
+  }
 });

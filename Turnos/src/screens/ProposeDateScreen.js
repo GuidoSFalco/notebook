@@ -5,8 +5,8 @@ import { CalendarDays, Trash, Calendar, Clock, User } from 'lucide-react-native'
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import CustomCalendar from '../components/CustomCalendar';
 import Button from '../components/Button';
-// import TimeSlotGrid from '../components/TimeSlotGrid';
-import { generateTimeSlots } from '../utils/timeUtils';
+import VerticalAgenda from '../components/VerticalAgenda';
+import { generateTimeSlots, generateMockOccupancy } from '../utils/timeUtils';
 
 const TIME_SLOTS = generateTimeSlots(15, 9, 18);
 
@@ -14,6 +14,15 @@ export default function ProposeDateScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { appointment, onProposalSent } = route.params || {};
   const [proposalDates, setProposalDates] = useState([]);
+  const [activeDateIndex, setActiveDateIndex] = useState(0);
+
+  const occupancy = React.useMemo(() => generateMockOccupancy(new Date().getFullYear(), new Date().getMonth()), []);
+
+  const getDayAppointments = (date) => {
+    // Mock existing appointments for the selected date to show availability
+    // In a real app, this would fetch from backend/store
+    return [];
+  };
 
   const handleDateSelect = (dateString) => {
       setProposalDates(prev => {
@@ -87,6 +96,7 @@ export default function ProposeDateScreen({ navigation, route }) {
                     onSelectDate={handleDateSelect}
                     originalDate={appointment?.date?.split('T')[0]}
                     multiSelect={true}
+                    occupancy={occupancy}
                 />
             </View>
 
@@ -191,7 +201,7 @@ const styles = StyleSheet.create({
   stepHeader: {
       fontSize: 18,
       fontWeight: '600',
-      marginTop: SPACING.l,
+      marginTop: SPACING.xxl,
       marginBottom: SPACING.m,
       color: COLORS.light.text,
   },

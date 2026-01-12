@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, Platform, TextInput } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -7,9 +7,9 @@ import { Calendar, Clock, CheckCircle } from 'lucide-react-native';
 import Button from '../components/Button';
 import CustomCalendar from '../components/CustomCalendar';
 import VerticalAgenda from '../components/VerticalAgenda';
-import { MY_APPOINTMENTS } from '../constants/mockData';
-import { generateTimeSlots } from '../utils/timeUtils';
+import { generateTimeSlots, formatDateES, generateMockOccupancy } from '../utils/timeUtils';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
+import AppointmentService from '../services/appointment.service';
 
 const TIME_SLOTS = generateTimeSlots(15, 9, 18);
 
@@ -21,27 +21,63 @@ export default function BookingScreen() {
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [professionalAppointments, setProfessionalAppointments] = useState([]);
 
-  const handleConfirm = () => {
-    Alert.alert(
-      '¡Turno Confirmado!',
-      `Has reservado con ${professional.name} para el ${selectedDate} a las ${selectedTime}`,
-      [
-        {
-          text: 'Ir a Mis Turnos',
-          onPress: () => {
-            navigation.popToTop();
-            navigation.navigate('Appointments');
-          }
-        }
-      ]
-    );
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const data = await AppointmentService.getByProfessional(professional.id);
+        setProfessionalAppointments(data);
+      } catch (error) {
+        console.error('Error fetching professional appointments:', error);
+      }
+    };
+
+    if (professional?.id) {
+      fetchAppointments();
+    }
+  }, [professional.id]);
+
+  // Generate mock occupancy
+  const occupancy = React.useMemo(() => generateMockOccupancy(new Date().getFullYear(), new Date().getMonth()), []);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+        const dateTimeString = `${selectedDate}T${selectedTime}:00`;
+        
+        await AppointmentService.create({
+            professionalId: professional.id,
+            date: dateTimeString,
+            serviceType: 'Consulta',
+            notes: notes
+        });
+
+        Alert.alert(
+          '¡Turno Confirmado!',
+          `Has reservado con ${professional.name} para el ${selectedDate} a las ${selectedTime}`,
+          [
+            {
+              text: 'Ir a Mis Turnos',
+              onPress: () => {
+                navigation.popToTop();
+                navigation.navigate('Appointments');
+              }
+            }
+          ]
+        );
+    } catch (error) {
+        Alert.alert('Error', error.response?.data?.message || 'No se pudo reservar el turno');
+    } finally {
+        setLoading(false);
+    }
   };
 
   const getProfessionalAppointments = (date) => {
       if (!date) return [];
-      return MY_APPOINTMENTS.filter(a => 
-         a.professionalId === professional.id && 
+      return professionalAppointments.filter(a => 
          a.date.startsWith(date)
       ).map(a => ({
          startTime: a.date.split('T')[1].substring(0, 5),
@@ -64,6 +100,7 @@ export default function BookingScreen() {
               setSelectedTime(null);
           }}
           blockedDates={professional.fullDates}
+          occupancy={occupancy}
         />
       </View>
 
@@ -106,6 +143,20 @@ export default function BookingScreen() {
             <Text style={styles.summaryValue}>${professional.price}</Text>
         </View>
       </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Notas adicionales</Text>
+        <TextInput
+          style={styles.textArea}
+          placeholder="Ej: Primera consulta, dolor de cabeza..."
+          placeholderTextColor={COLORS.light.textSecondary}
+          value={notes}
+          onChangeText={setNotes}
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+        />
+      </View>
     </View>
   );
 
@@ -131,6 +182,7 @@ export default function BookingScreen() {
           <Button 
             title="Confirmar Reserva" 
             onPress={handleConfirm}
+            loading={loading}
             style={{ backgroundColor: COLORS.success }}
           />
         )}
@@ -167,29 +219,9 @@ const styles = StyleSheet.create({
   calendarContainer: {
     marginBottom: SPACING.l,
   },
-  timeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.s,
-  },
-  timeButton: {
-    width: '30%',
-    marginBottom: SPACING.s,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: SPACING.l,
-    backgroundColor: COLORS.light.card,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.light.border,
-    paddingBottom: SPACING.xl,
-  },
   confirmationContainer: {
     alignItems: 'center',
-    paddingTop: SPACING.xl,
+    paddingVertical: SPACING.xl,
   },
   confirmationTitle: {
     fontSize: 24,
@@ -201,39 +233,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.light.textSecondary,
     marginBottom: SPACING.xl,
+    textAlign: 'center',
   },
   summaryCard: {
     width: '100%',
     backgroundColor: COLORS.light.card,
+    borderRadius: RADIUS.m,
     padding: SPACING.l,
-    borderRadius: RADIUS.l,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+    marginBottom: SPACING.l,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: SPACING.m,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.light.border,
-    paddingBottom: SPACING.s,
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.light.textSecondary,
   },
   summaryValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: COLORS.light.text,
+  },
+  inputContainer: {
+    width: '100%',
+    marginBottom: SPACING.l,
+  },
+  label: {
+    fontSize: 14,
+    color: COLORS.light.textSecondary,
+    marginBottom: SPACING.s,
+    alignSelf: 'flex-start',
+  },
+  textArea: {
+    width: '100%',
+    backgroundColor: COLORS.light.card,
+    borderRadius: RADIUS.m,
+    padding: SPACING.m,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    minHeight: 100,
+    color: COLORS.light.text,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: SPACING.l,
+    backgroundColor: COLORS.light.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.light.border,
   },
 });

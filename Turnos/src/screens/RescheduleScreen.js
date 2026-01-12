@@ -1,24 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Linking, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Clock, CheckCircle, ArrowRight, MessageCircle } from 'lucide-react-native';
 import Button from '../components/Button';
 import CustomCalendar from '../components/CustomCalendar';
 import VerticalAgenda from '../components/VerticalAgenda';
-import { generateTimeSlots } from '../utils/timeUtils';
+import { generateTimeSlots, formatDateES, generateMockOccupancy } from '../utils/timeUtils';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
-import { PROFESSIONALS, MY_APPOINTMENTS } from '../constants/mockData';
+import AppointmentService from '../services/appointment.service';
+import ProfessionalService from '../services/professional.service';
 
 const TIME_SLOTS = generateTimeSlots(15, 9, 18);
 
 export default function RescheduleScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { appointment } = route.params;
-  const professional = PROFESSIONALS.find(p => p.id === appointment.professionalId);
+  const [professional, setProfessional] = useState(appointment.professional || { id: appointment.professionalId, name: appointment.professionalName || 'Profesional' });
   
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(appointment.date.split('T')[0]);
   const [selectedTime, setSelectedTime] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [professionalAppointments, setProfessionalAppointments] = useState([]);
+
+  useEffect(() => {
+      const fetchData = async () => {
+          try {
+              // Fetch professional appointments
+              const appts = await AppointmentService.getByProfessional(appointment.professionalId);
+              setProfessionalAppointments(appts);
+
+              // Fetch professional details if not fully available (e.g. for phone)
+              if (!professional.phone) {
+                  const profData = await ProfessionalService.getById(appointment.professionalId);
+                  setProfessional(profData);
+              }
+          } catch (error) {
+              console.error('Error fetching data:', error);
+          }
+      };
+      fetchData();
+  }, [appointment.professionalId]);
+
+  const occupancy = React.useMemo(() => generateMockOccupancy(new Date().getFullYear(), new Date().getMonth()), []);
 
   const handleWhatsApp = () => {
     // Check if professional has phone
@@ -38,26 +62,36 @@ export default function RescheduleScreen({ route, navigation }) {
     }
   };
 
-  const handleConfirm = () => {
-    Alert.alert(
-      'Solicitud Enviada',
-      `Se ha enviado la solicitud de cambio al profesional. Te notificaremos cuando sea aceptada.`,
-      [
-        {
-          text: 'Volver a Mis Turnos',
-          onPress: () => {
-            // Here we would actually update the backend state
-            navigation.navigate('Main', { 
-                screen: 'Appointments',
-                params: { 
-                    updatedAppointmentId: appointment.id,
-                    newStatus: 'reschedule_requested'
-                }
-            });
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      // 3 = Reschedule Requested (mapped to backend status)
+      await AppointmentService.updateStatus(appointment.id, 3);
+      
+      Alert.alert(
+        'Solicitud Enviada',
+        `Se ha enviado la solicitud de cambio al profesional. Te notificaremos cuando sea aceptada.`,
+        [
+          {
+            text: 'Volver a Mis Turnos',
+            onPress: () => {
+              navigation.navigate('Main', { 
+                  screen: 'Appointments',
+                  params: { 
+                      updatedAppointmentId: appointment.id,
+                      newStatus: 'reschedule_requested'
+                  }
+              });
+            }
           }
-        }
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error('Error rescheduling:', error);
+      Alert.alert('Error', 'No se pudo enviar la solicitud de cambio.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderCurrentAppointment = () => (
@@ -80,8 +114,7 @@ export default function RescheduleScreen({ route, navigation }) {
 
   const getProfessionalAppointments = (date) => {
       if (!date) return [];
-      return MY_APPOINTMENTS.filter(a => 
-         a.professionalId === appointment.professionalId && 
+      return professionalAppointments.filter(a => 
          a.date.startsWith(date)
       ).map(a => ({
          startTime: a.date.split('T')[1].substring(0, 5),
@@ -107,6 +140,7 @@ export default function RescheduleScreen({ route, navigation }) {
             }}
             originalDate={appointment.date.split('T')[0]}
             blockedDates={professional?.fullDates}
+            occupancy={occupancy}
         />
       </View>
 
@@ -148,7 +182,7 @@ export default function RescheduleScreen({ route, navigation }) {
       <View style={styles.summaryCard}>
         <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Nueva Fecha</Text>
-            <Text style={styles.summaryValue}>{selectedDate}</Text>
+            <Text style={styles.summaryValue}>{formatDateES(selectedDate)}</Text>
         </View>
         <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Nuevo Horario</Text>
@@ -164,12 +198,14 @@ export default function RescheduleScreen({ route, navigation }) {
         <Button 
             title="Confirmar Solicitud" 
             onPress={handleConfirm}
+            loading={loading}
             style={styles.fullButton}
         />
         <Button 
             title="Volver" 
             variant="outline"
             onPress={() => setStep(1)}
+            disabled={loading}
             style={[styles.fullButton, { marginTop: SPACING.m }]}
         />
       </View>

@@ -1,31 +1,78 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar, Clock, Filter, Check, X, Phone, ArrowRight, CalendarDays } from 'lucide-react-native';
 import { format, addDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
-import { MY_APPOINTMENTS } from '../constants/mockData';
 import Button from '../components/Button';
 import VerticalAgenda from '../components/VerticalAgenda';
 import ViewModeToggle from '../components/ViewModeToggle';
 import CustomCalendar from '../components/CustomCalendar';
+import { formatDateES, formatTime } from '../utils/timeUtils';
+import AppointmentService from '../services/appointment.service';
 
-// Mock logged in professional ID
-const CURRENT_PROFESSIONAL_ID = 'p1'; 
+const STATUS_MAP = {
+  0: 'confirmed',
+  1: 'completed',
+  2: 'cancelled',
+  3: 'reschedule_requested',
+  4: 'cancellation_requested',
+  5: 'proposal_sent'
+};
+
+const STATUS_TO_INT = {
+    'confirmed': 0,
+    'completed': 1,
+    'cancelled': 2,
+    'reschedule_requested': 3,
+    'cancellation_requested': 4,
+    'proposal_sent': 5
+};
 
 export default function ProfessionalAppointmentsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const [appointments, setAppointments] = useState(
-    MY_APPOINTMENTS.filter(a => a.professionalId === CURRENT_PROFESSIONAL_ID || true) // Show all for demo purposes if p1 has few
-  ); 
+  const [appointments, setAppointments] = useState([]); 
   const [filterStatus, setFilterStatus] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('agenda'); // 'agenda' | 'list'
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchAppointments = useCallback(async () => {
+    try {
+      const data = await AppointmentService.getMyAppointments();
+      const mappedData = data.map(appt => ({
+        ...appt,
+        status: typeof appt.status === 'number' ? STATUS_MAP[appt.status] || appt.status : appt.status,
+        startTime: formatTime(appt.date),
+        endTime: appt.endTime || '11:00',
+        clientName: appt.clientName || 'Cliente',
+        service: appt.serviceType || appt.service || 'Consulta'
+      }));
+      setAppointments(mappedData);
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      Alert.alert('Error', 'No se pudieron cargar los turnos');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAppointments();
+  };
+
 
   const getStatusBadge = (status) => {
       switch (status) {
@@ -49,23 +96,38 @@ export default function ProfessionalAppointmentsScreen() {
         return a.status === filterStatus;
     }).map(a => ({
         ...a,
-        startTime: a.date.split('T')[1].substring(0, 5),
+        startTime: formatTime(a.date),
         endTime: a.endTime || '11:00', // Mock duration if not present
         color: getStatusBadge(a.status).color
     }));
   }, [appointments, selectedDate, filterStatus]);
 
-  const handleAction = (id, action, type) => {
+  const occupancy = useMemo(() => {
+    const occ = {};
+    const counts = {};
+    appointments.forEach(a => {
+        const dateStr = a.date.split('T')[0];
+        counts[dateStr] = (counts[dateStr] || 0) + 1;
+    });
+    
+    Object.keys(counts).forEach(date => {
+        const count = counts[date];
+        if (count >= 5) occ[date] = 'full';
+        else if (count >= 3) occ[date] = 'high';
+        else occ[date] = 'medium';
+    });
+    return occ;
+  }, [appointments]);
+
+  const handleAction = async (id, action, type) => {
       if (action === 'propose') {
           const appointment = appointments.find(a => a.id === id);
           setSelectedAppointment(appointment);
           navigation.navigate('ProposeDate', {
             appointment,
             onProposalSent: (dates) => {
-                setAppointments(prev => prev.map(a => {
-                    if (a.id !== id) return a;
-                    return { ...a, status: 'proposal_sent' };
-                }));
+                // Ideally this updates backend via ProposeDate screen or we refresh here
+                fetchAppointments();
             }
           });
           return;
@@ -78,21 +140,25 @@ export default function ProfessionalAppointmentsScreen() {
               { text: 'Cancelar', style: 'cancel' },
               { 
                   text: 'Confirmar', 
-                  onPress: () => {
-                      setAppointments(prev => prev.map(a => {
-                          if (a.id !== id) return a;
-                          
-                          let newStatus = a.status;
+                  onPress: async () => {
+                      try {
+                          let newStatus = 'confirmed';
                           if (type === 'reschedule') {
-                              newStatus = action === 'accept' ? 'confirmed' : 'confirmed'; // Revert to confirmed if rejected, or new date if accepted
-                              // Logic to update date would go here if accepted
+                              newStatus = action === 'accept' ? 'confirmed' : 'confirmed';
                           } else if (type === 'cancellation') {
                               newStatus = action === 'accept' ? 'cancelled' : 'confirmed';
                           }
-                          
-                          return { ...a, status: newStatus };
-                      }));
-                      setSelectedAppointment(null);
+
+                          const statusInt = STATUS_TO_INT[newStatus];
+                          if (statusInt !== undefined) {
+                              await AppointmentService.updateStatus(id, statusInt);
+                              fetchAppointments();
+                              setSelectedAppointment(null);
+                          }
+                      } catch (error) {
+                          console.error('Error updating status:', error);
+                          Alert.alert('Error', 'No se pudo actualizar el estado');
+                      }
                   }
               }
           ]
@@ -123,11 +189,11 @@ export default function ProfessionalAppointmentsScreen() {
                 <Text style={styles.infoLabel}>Turno Original</Text>
                 <View style={styles.infoRow}>
                     <Calendar size={16} color={COLORS.light.textSecondary} />
-                    <Text style={styles.infoText}>{item.date.split('T')[0]}</Text>
+                    <Text style={styles.infoText}>{formatDateES(item.date)}</Text>
                 </View>
                 <View style={styles.infoRow}>
                     <Clock size={16} color={COLORS.light.textSecondary} />
-                    <Text style={styles.infoText}>{item.date.split('T')[1].substring(0, 5)}</Text>
+                    <Text style={styles.infoText}>{formatTime(item.date)}</Text>
                 </View>
             </View>
 
@@ -274,17 +340,28 @@ export default function ProfessionalAppointmentsScreen() {
           </View>
       )}
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 100 }} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Date Navigation */}
         <View style={{ paddingHorizontal: SPACING.m, marginBottom: SPACING.m }}>
           <CustomCalendar 
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
+            occupancy={occupancy}
           />
         </View>
 
         <View style={styles.agendaContainer}>
-          {viewMode === 'agenda' ? (
+          {loading ? (
+             <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
+                 <ActivityIndicator size="large" color={COLORS.primary} />
+             </View>
+          ) : viewMode === 'agenda' ? (
               <VerticalAgenda 
                   selectedTime={null}
                   onSelectTime={() => {}}
