@@ -2,7 +2,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Platform, StyleSheet } from 'react-native';
-import { Home, User, PlusCircle } from 'lucide-react-native';
+import { Home, User, PlusCircle, Plus } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import CreateEventScreen from '../screens/CreateEventScreen';
@@ -25,16 +25,19 @@ export default function BottomTabNavigator() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          position: 'absolute',
-          bottom: 25,
-          left: 20,
-          right: 20,
-          elevation: 0,
           backgroundColor: COLORS.surface,
-          borderRadius: 25,
-          height: 70,
-          ...SHADOWS.medium,
-          borderTopWidth: 0,
+          borderTopColor: COLORS.border,
+          ...Platform.select({
+            ios: {
+              shadowColor: COLORS.border,
+              shadowOffset: { width: 0, height: -1 },
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+            },
+            android: {
+              elevation: 4,
+            },
+          }),
         },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textSecondary,
@@ -60,7 +63,7 @@ export default function BottomTabNavigator() {
         })}
         options={{
           tabBarIcon: ({ focused }) => (
-            <PlusCircle color={COLORS.surface} size={30} />
+            <Plus color={COLORS.surface} size={30} />
           ),
           tabBarButton: (props) => (
             <CustomTabBarButton {...props} />

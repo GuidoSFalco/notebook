@@ -65,4 +65,5 @@ export const FONTS = {
   h3: { fontFamily: 'Poppins_700Bold', fontSize: 20 },
   body: { fontFamily: 'Poppins_400Regular', fontSize: 16, lineHeight: 24 },
   caption: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: COLORS.textSecondary },
+  captionWhite: { fontFamily: 'Poppins_500Medium', fontSize: 14 },
 };

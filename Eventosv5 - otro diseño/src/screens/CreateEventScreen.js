@@ -1,14 +1,77 @@
 
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../constants/theme';
 import { ArrowLeft, ArrowRight, Upload, Calendar, MapPin, DollarSign } from 'lucide-react-native';
 
 const STEPS = ['Detalles', 'Ubicación', 'Tickets'];
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 export default function CreateEventScreen({ navigation }) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [title, setTitle] = useState('');
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  const inputAnimation = useRef(new Animated.Value(0)).current;
+  const categoriesAnimation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(inputAnimation, {
+      toValue: title.length > 0 ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [title]);
+
+  useEffect(() => {
+    Animated.timing(categoriesAnimation, {
+      toValue: categoriesExpanded ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [categoriesExpanded]);
+
+  const animatedBorderColor = inputAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [COLORS.secondary, COLORS.primary]
+  });
+
+  const animatedBackgroundColor = inputAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#fff0f3', 'rgba(108, 99, 255, 0.05)']
+  });
+
+  const categoriesHeight = categoriesAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [40, 160],
+  });
+
+  const categories = [
+    'No definido',
+    'Boliche',
+    'Fiesta',
+    'Viaje',
+    'Nacional',
+    'Aire Libre',
+    'Virtual',
+    'Música',
+    'Juntada',
+    'Cumpleaños',
+    'Reunion Laboral',
+    'Casamiento',
+    'Feria',
+    'Arte',
+    'Tecnología',
+    'Deportivo',
+    'Otros',
+    'Show',
+    'Conciertos',
+    'Fiestas',
+    'Teatro',
+  ];
 
   const renderProgressBar = () => (
     <View style={styles.progressContainer}>
@@ -36,34 +99,141 @@ export default function CreateEventScreen({ navigation }) {
     </View>
   );
 
-  const renderStep1 = () => (
-    <View>
-      <Text style={styles.label}>Título del Evento</Text>
-      <TextInput 
-        style={styles.input} 
-        placeholder="Ej. Fiesta en la Playa"
-        placeholderTextColor={COLORS.textSecondary}
-      />
+  const renderStep1 = () => {
+    const normalizedSearch = categorySearch.toLowerCase().trim();
 
-      <Text style={styles.label}>Categoría</Text>
-      <View style={styles.categoryRow}>
-        {['Música', 'Arte', 'Tecnología'].map((cat) => (
-          <TouchableOpacity key={cat} style={styles.categoryChip}>
-            <Text style={styles.categoryChipText}>{cat}</Text>
+    const filteredBySearch =
+      categoriesExpanded && normalizedSearch.length > 0
+        ? categories.filter((cat) =>
+            cat.toLowerCase().includes(normalizedSearch)
+          )
+        : categories;
+
+    const withoutSelected = filteredBySearch.filter(
+      (cat) => cat !== selectedCategory
+    );
+    const orderedCategories = selectedCategory
+      ? [selectedCategory, ...withoutSelected]
+      : filteredBySearch;
+
+    return (
+      <View>
+        <Text style={styles.label}>Título del Evento</Text>
+        <AnimatedTextInput
+          style={[
+            styles.input,
+            styles.requiredInput,
+            {
+              borderColor: animatedBorderColor,
+              backgroundColor: animatedBackgroundColor,
+            },
+          ]}
+          placeholder="Ej. Fiesta en la Playa"
+          placeholderTextColor={COLORS.textSecondary}
+          value={title}
+          onChangeText={setTitle}
+        />
+
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Categoría</Text>
+          <TouchableOpacity
+            style={styles.expandButton}
+            onPress={() => setCategoriesExpanded(!categoriesExpanded)}
+          >
+            <Text style={styles.expandButtonText}>
+              {categoriesExpanded ? 'Ver menos' : 'Ver más'}
+            </Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      <Text style={styles.label}>Descripción</Text>
-      <TextInput 
-        style={[styles.input, styles.textArea]} 
-        placeholder="Cuéntanos más sobre tu evento..."
-        placeholderTextColor={COLORS.textSecondary}
-        multiline
-        numberOfLines={4}
-      />
-    </View>
-  );
+        {categoriesExpanded && (
+          <TextInput
+            style={styles.categorySearchInput}
+            placeholder="Buscar categoría..."
+            placeholderTextColor={COLORS.textSecondary}
+            value={categorySearch}
+            onChangeText={setCategorySearch}
+          />
+        )}
+
+        {categoriesExpanded ? (
+          <Animated.View
+            style={[
+              styles.categoryContainerExpanded,
+              { height: categoriesHeight, overflow: 'hidden' },
+            ]}
+          >
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRow}
+            >
+              {orderedCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory === cat && styles.categoryChipSelected,
+                  ]}
+                  onPress={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      selectedCategory === cat && styles.categoryChipTextSelected,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        ) : (
+          <Animated.View
+            style={[
+              styles.categoryContainerCollapsed,
+              { height: categoriesHeight, overflow: 'hidden' },
+            ]}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRowHorizontal}
+            >
+              {orderedCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory === cat && styles.categoryChipSelected,
+                  ]}
+                  onPress={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      selectedCategory === cat && styles.categoryChipTextSelected,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        <Text style={styles.label}>Descripción</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Cuéntanos más sobre tu evento..."
+          placeholderTextColor={COLORS.textSecondary}
+          multiline
+          numberOfLines={4}
+        />
+      </View>
+    );
+  };
 
   const renderStep2 = () => (
     <View>
@@ -151,14 +321,29 @@ export default function CreateEventScreen({ navigation }) {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>
-            {currentStep === STEPS.length - 1 ? 'Publicar Evento' : 'Siguiente'}
-          </Text>
-          {currentStep < STEPS.length - 1 && (
-            <ArrowRight size={20} color={COLORS.surface} style={{ marginLeft: 8 }} />
-          )}
-        </TouchableOpacity>
+        {/* {currentStep === 0 ? ( */}
+          <View style={styles.footerButtonsRow}>
+            <TouchableOpacity style={[styles.nextButton, styles.flexNextButton]} onPress={handleNext}>
+              <Text style={styles.nextButtonText}>Siguiente</Text>
+              <ArrowRight size={20} color={COLORS.surface} style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+            
+            {title.length > 0 && (
+              <TouchableOpacity style={[styles.nextButton, styles.flexCreateButton, styles.createButton]} onPress={() => navigation.goBack()}>
+                <Text style={styles.nextButtonText}>Crear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        {/* ) : (
+          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+            <Text style={styles.nextButtonText}>
+              {currentStep === STEPS.length - 1 ? 'Publicar Evento' : 'Siguiente'}
+            </Text>
+            {currentStep < STEPS.length - 1 && (
+              <ArrowRight size={20} color={COLORS.surface} style={{ marginLeft: 8 }} />
+            )}
+          </TouchableOpacity>
+        )} */}
       </View>
     </SafeAreaView>
   );
@@ -168,6 +353,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  requiredInput: {
+    borderColor: COLORS.secondary,
+    borderWidth: 2,
+    backgroundColor: '#fff0f3', // Light tint to make it stand out more
+  },
+  footerButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  flexNextButton: {
+    flex: 1,
+  },
+  flexCreateButton: {
+    flex: 0.5,
+  },
+  createButton: {
+    backgroundColor: COLORS.success,
   },
   header: {
     flexDirection: 'row',
@@ -220,6 +423,42 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.s,
     marginTop: SIZES.m,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categoryContainerExpanded: {
+    marginTop: SIZES.s,
+  },
+  categoryContainerCollapsed: {
+    // marginTop: SIZES.s,
+  },
+  categorySearchInput: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: SIZES.m,
+    paddingVertical: SIZES.s,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...FONTS.body,
+    color: COLORS.text,
+    marginTop: SIZES.s,
+    marginBottom: SIZES.s,
+  },
+  expandButton: {
+    paddingHorizontal: SIZES.s,
+    paddingVertical: SIZES.s / 2,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  expandButtonText: {
+    ...FONTS.caption,
+    color: COLORS.primary,
+    fontSize: 10,
+  },
   input: {
     backgroundColor: COLORS.surface,
     padding: SIZES.m,
@@ -228,6 +467,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     ...FONTS.body,
     color: COLORS.text,
+    
+    outlineStyle: 'none', // Disable focus outline
   },
   textArea: {
     height: 120,
@@ -237,7 +478,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
+  categoryRowHorizontal: {
+    marginTop: SIZES.s,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   categoryChip: {
+    minHeight: 40,
     paddingHorizontal: SIZES.m,
     paddingVertical: SIZES.s,
     backgroundColor: COLORS.surface,
@@ -250,6 +497,13 @@ const styles = StyleSheet.create({
   categoryChipText: {
     ...FONTS.caption,
     color: COLORS.text,
+  },
+  categoryChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  categoryChipTextSelected: {
+    color: COLORS.surface,
   },
   rowInput: {
     flexDirection: 'row',
@@ -266,10 +520,20 @@ const styles = StyleSheet.create({
     marginRight: SIZES.s,
   },
   inputNoBorder: {
-    flex: 1,
+    // flex: 1,
+    // ...FONTS.body,
+    // color: COLORS.text,
+    // height: '100%',
+
+    backgroundColor: COLORS.surface,
+    paddingLeft: SIZES.m,
+    paddingVertical: SIZES.s,
+    borderRadius: SIZES.radius,
+    width: '100%',
+    // borderColor: COLORS.border,
     ...FONTS.body,
     color: COLORS.text,
-    height: '100%',
+    outlineStyle: 'none', // Disable focus outline
   },
   mapPlaceholder: {
     height: 150,

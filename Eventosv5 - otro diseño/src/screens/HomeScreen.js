@@ -202,9 +202,16 @@ const styles = StyleSheet.create({
     marginRight: SIZES.s,
   },
   searchInput: {
-    flex: 1,
+
+    backgroundColor: COLORS.surface,
+    paddingLeft: SIZES.xs,
+    // paddingVertical: SIZES.s,
+    borderRadius: SIZES.radius,
+    width: '100%',
+    // borderColor: COLORS.border,
     ...FONTS.body,
     color: COLORS.text,
+    outlineStyle: 'none', // Disable focus outline
   },
   categoriesContainer: {
     marginBottom: SIZES.l,

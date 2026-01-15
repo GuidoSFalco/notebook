@@ -53,7 +53,13 @@ const EventCard = ({ event, onPress, layout = 'vertical' }) => {
         <View style={styles.row}>
           <View style={styles.locationContainer}>
             <MapPin size={16} color={COLORS.textSecondary} />
-            <Text style={styles.location}>{event.location}</Text>
+            <Text
+              style={styles.location}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {event.location}
+            </Text>
           </View>
           <View style={styles.attendeesContainer}>
             <View style={styles.avatarStack}>
@@ -136,6 +142,9 @@ const styles = StyleSheet.create({
   attendeesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    width: 80,
+    flexShrink: 0,
   },
   avatarStack: {
     flexDirection: 'row',
@@ -187,8 +196,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   locationContainer: {
+    // backgroundColor: 'rgba(0,0,0,0.05)',
+    // paddingHorizontal: 8,
+    // paddingVertical: 4,
+    // borderRadius: SIZES.radius,
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   location: {
     ...FONTS.caption,

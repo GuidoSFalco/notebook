@@ -163,11 +163,11 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     color: COLORS.surface,
-    ...FONTS.caption,
+    ...FONTS.captionWhite,
     fontWeight: '700',
   },
   title: {
-    ...FONTS.h1,
+    ...FONTS.h2,
     color: COLORS.surface,
     marginBottom: 10,
   },
