@@ -5,12 +5,25 @@ import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
 import { MapPin, Calendar, ArrowLeft, Share2, Heart } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GOOGLE_MAPS_API_KEY } from '../config/mapsConfig';
+import EventMap from '../components/EventMap';
 
 const { width } = Dimensions.get('window');
 
 export default function EventDetailScreen({ route, navigation }) {
   const { event } = route.params;
   const insets = useSafeAreaInsets();
+
+  const isVirtual = event.type === 'virtual' || event.isVirtual;
+  const hasCoordinates = typeof event.latitude === 'number' && typeof event.longitude === 'number';
+  const mapRegion = hasCoordinates
+    ? {
+        latitude: event.latitude,
+        longitude: event.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }
+    : null;
 
   return (
     <View style={styles.container}>
@@ -63,26 +76,70 @@ export default function EventDetailScreen({ route, navigation }) {
               <Text style={styles.organizerLabel}>Organizado por</Text>
               <Text style={styles.organizerName}>{event.organizer.name}</Text>
             </View>
-            <TouchableOpacity style={styles.followButton}>
-              <Text style={styles.followText}>Seguir</Text>
-            </TouchableOpacity>
+            <View style={styles.organizerActions}>
+              <TouchableOpacity style={styles.followButton}>
+                <Text style={styles.followText}>Seguir</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() =>
+                  navigation.navigate('EditEvent', {
+                    mode: 'edit',
+                    event,
+                    onSubmit: (updatedEvent) => {
+                      navigation.setParams({ event: updatedEvent });
+                    },
+                  })
+                }
+              >
+                <Text style={styles.editButtonText}>Editar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Description */}
           <Text style={styles.sectionTitle}>Acerca del evento</Text>
           <Text style={styles.description}>{event.description}</Text>
 
-          {/* Location */}
-          <Text style={styles.sectionTitle}>Ubicación</Text>
-          <View style={styles.locationCard}>
-            <View style={styles.locationIconContainer}>
-              <MapPin size={24} color={COLORS.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.locationName}>{event.location}</Text>
-              <Text style={styles.locationAddress}>Av. Costanera 123, Ciudad</Text>
-            </View>
-          </View>
+          {isVirtual ? (
+            <>
+              <Text style={styles.sectionTitle}>Evento virtual</Text>
+              {event.virtualLink ? (
+                <Text style={styles.virtualLink}>{event.virtualLink}</Text>
+              ) : (
+                <Text style={styles.virtualHelperText}>
+                  Este evento se realiza de forma virtual.
+                </Text>
+              )}
+            </>
+          ) : (
+            <>
+              <Text style={styles.sectionTitle}>Ubicación</Text>
+              <View style={styles.locationCard}>
+                <View style={styles.locationIconContainer}>
+                  <MapPin size={24} color={COLORS.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.locationName}>{event.locationAddress || event.location}</Text>
+                  {event.locationAddress && event.locationAddress !== event.location ? (
+                    <Text style={styles.locationAddress}>{event.locationAddress}</Text>
+                  ) : null}
+                </View>
+              </View>
+              {hasCoordinates && mapRegion && (
+                <View style={styles.mapContainer}>
+                  <EventMap
+                    style={styles.map}
+                    initialRegion={mapRegion}
+                    region={mapRegion}
+                    markerCoordinate={mapRegion}
+                    interactive={false}
+                    googleMapsApiKey={GOOGLE_MAPS_API_KEY || undefined}
+                  />
+                </View>
+              )}
+            </>
+          )}
 
           {/* Attendees */}
           <View style={styles.attendeesSection}>
@@ -193,6 +250,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SIZES.xl,
   },
+  organizerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   organizerAvatar: {
     width: 50,
     height: 50,
@@ -222,12 +283,36 @@ const styles = StyleSheet.create({
     ...FONTS.caption,
     fontWeight: '600',
   },
+  editButton: {
+    marginLeft: SIZES.s,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  editButtonText: {
+    ...FONTS.caption,
+    color: COLORS.text,
+    fontWeight: '600',
+  },
   sectionTitle: {
     ...FONTS.h3,
     color: COLORS.text,
     marginBottom: SIZES.m,
   },
   description: {
+    ...FONTS.body,
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.xl,
+  },
+  virtualLink: {
+    ...FONTS.body,
+    color: COLORS.primary,
+    marginBottom: SIZES.xl,
+  },
+  virtualHelperText: {
     ...FONTS.body,
     color: COLORS.textSecondary,
     marginBottom: SIZES.xl,
@@ -253,6 +338,15 @@ const styles = StyleSheet.create({
   },
   locationAddress: {
     ...FONTS.caption,
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: SIZES.radius,
+    overflow: 'hidden',
+    marginBottom: SIZES.xl,
+  },
+  map: {
+    flex: 1,
   },
   attendeesSection: {
     marginBottom: SIZES.xl,

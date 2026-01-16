@@ -1,19 +1,46 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../constants/theme';
-import { ArrowLeft, ArrowRight, Upload, Calendar, MapPin, DollarSign } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Upload, Calendar, MapPin, DollarSign, X } from 'lucide-react-native';
+import { GOOGLE_MAPS_API_KEY } from '../config/mapsConfig';
+import EventMap from '../components/EventMap';
+import EventDateTimePicker from '../components/EventDateTimePicker';
 
 const STEPS = ['Detalles', 'Ubicación', 'Tickets'];
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
-export default function CreateEventScreen({ navigation }) {
+export default function CreateEventScreen({ navigation, route }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [title, setTitle] = useState('');
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [description, setDescription] = useState('');
+  const [dateText, setDateText] = useState('');
+  const [selectedDateTime, setSelectedDateTime] = useState(null);
+  const [eventType, setEventType] = useState('presencial');
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationAddress, setLocationAddress] = useState('');
+  const [virtualLink, setVirtualLink] = useState('');
+  const [mapRegion, setMapRegion] = useState({
+    latitude: -34.6037,
+    longitude: -58.3816,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+  const [selectedCoordinate, setSelectedCoordinate] = useState(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState('');
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [isRefiningLocation, setIsRefiningLocation] = useState(false);
+  const [originalCoordinate, setOriginalCoordinate] = useState(null);
+  const suggestionsTimeout = useRef(null);
+
+  const mode = route?.params?.mode === 'edit' ? 'edit' : 'create';
+  const initialEvent = route?.params?.event || null;
+  const onSubmit = route?.params?.onSubmit;
 
   const inputAnimation = useRef(new Animated.Value(0)).current;
   const categoriesAnimation = useRef(new Animated.Value(0)).current;
@@ -33,6 +60,37 @@ export default function CreateEventScreen({ navigation }) {
       useNativeDriver: false,
     }).start();
   }, [categoriesExpanded]);
+
+  useEffect(() => {
+    if (initialEvent) {
+      setTitle(initialEvent.title || '');
+      setSelectedCategory(initialEvent.category || null);
+      setDescription(initialEvent.description || '');
+      setDateText(initialEvent.date || '');
+      if (initialEvent.type === 'virtual' || initialEvent.isVirtual) {
+        setEventType('virtual');
+      } else {
+        setEventType('presencial');
+      }
+      const initialAddress = initialEvent.locationAddress || initialEvent.location || '';
+      setLocationAddress(initialAddress);
+      setLocationQuery(initialAddress);
+      if (typeof initialEvent.latitude === 'number' && typeof initialEvent.longitude === 'number') {
+        const region = {
+          latitude: initialEvent.latitude,
+          longitude: initialEvent.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        };
+        setMapRegion(region);
+        setSelectedCoordinate({
+          latitude: initialEvent.latitude,
+          longitude: initialEvent.longitude,
+        });
+      }
+      setVirtualLink(initialEvent.virtualLink || '');
+    }
+  }, [initialEvent]);
 
   const animatedBorderColor = inputAnimation.interpolate({
     inputRange: [0, 1],
@@ -147,13 +205,23 @@ export default function CreateEventScreen({ navigation }) {
         </View>
 
         {categoriesExpanded && (
-          <TextInput
-            style={styles.categorySearchInput}
-            placeholder="Buscar categoría..."
-            placeholderTextColor={COLORS.textSecondary}
-            value={categorySearch}
-            onChangeText={setCategorySearch}
-          />
+          <View style={styles.categorySearchContainer}>
+            <TextInput
+              style={styles.categorySearchInput}
+              placeholder="Buscar categoría..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={categorySearch}
+              onChangeText={setCategorySearch}
+            />
+            {categorySearch.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearSearchButton}
+                onPress={() => setCategorySearch('')}
+              >
+                <X size={16} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         {categoriesExpanded ? (
@@ -164,6 +232,8 @@ export default function CreateEventScreen({ navigation }) {
             ]}
           >
             <ScrollView
+              nestedScrollEnabled={true}
+              style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.categoryRow}
             >
@@ -230,36 +300,360 @@ export default function CreateEventScreen({ navigation }) {
           placeholderTextColor={COLORS.textSecondary}
           multiline
           numberOfLines={4}
+          value={description}
+          onChangeText={setDescription}
         />
       </View>
     );
   };
 
+  const handleEventTypeChange = (type) => {
+    setEventType(type);
+    if (type === 'virtual') {
+      setSelectedCoordinate(null);
+      setLocationAddress('');
+      setLocationQuery('');
+      setIsRefiningLocation(false);
+    }
+  };
+
+  const handleMapPress = async (event) => {
+    if (eventType === 'virtual') {
+      return;
+    }
+    const coordinate = event.nativeEvent.coordinate;
+    setSelectedCoordinate(coordinate);
+    setMapRegion((prev) => ({
+      ...prev,
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+    }));
+    if (isRefiningLocation) {
+      return;
+    }
+    if (!GOOGLE_MAPS_API_KEY) {
+      setLocationAddress('');
+      return;
+    }
+    try {
+      setIsGeocoding(true);
+      setGeocodeError('');
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+      console.log(url)
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.status === 'OK' && data.results && data.results[0]) {
+        const formatted = data.results[0].formatted_address;
+        setLocationAddress(formatted);
+        setLocationQuery(formatted);
+      } else {
+        setGeocodeError('No se pudo obtener la dirección.');
+      }
+    } catch (error) {
+      setGeocodeError('Error al obtener la dirección.');
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleSearchLocation = async (input) => {
+    const query = (input || locationQuery).trim();
+    if (!query) {
+      setGeocodeError('Ingresa una dirección para buscar.');
+      return;
+    }
+    if (!GOOGLE_MAPS_API_KEY) {
+      setLocationAddress(query);
+      setSelectedCoordinate(null);
+      return;
+    }
+    try {
+      setIsGeocoding(true);
+      setGeocodeError('');
+      const encoded = encodeURIComponent(query);
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${GOOGLE_MAPS_API_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.status === 'OK' && data.results && data.results[0]) {
+        const result = data.results[0];
+        const { lat, lng } = result.geometry.location;
+        const formatted = result.formatted_address;
+        const coordinate = {
+          latitude: lat,
+          longitude: lng,
+        };
+        setSelectedCoordinate(coordinate);
+        setMapRegion({
+          latitude: coordinate.latitude,
+          longitude: coordinate.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+        setLocationAddress(formatted);
+      } else if (data.status === 'REQUEST_DENIED') {
+        setLocationAddress(query);
+        setGeocodeError('Error de API Key: Permiso denegado.');
+        console.error("Geocoding API Error:", data.error_message);
+      } else {
+        setLocationAddress(query);
+        setGeocodeError('No se encontró la dirección.');
+        console.log("Geocoding Status:", data.status);
+      }
+    } catch (error) {
+      setLocationAddress(query);
+      setGeocodeError('Error al buscar la dirección.');
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleRegionChangeComplete = (region) => {
+    setMapRegion(region);
+    if (isRefiningLocation) {
+      setSelectedCoordinate({
+        latitude: region.latitude,
+        longitude: region.longitude,
+      });
+    }
+  };
+
+  const handleClearLocationInput = () => {
+    setLocationQuery('');
+    setLocationSuggestions([]);
+    if (geocodeError) {
+      setGeocodeError('');
+    }
+    if (isRefiningLocation) {
+      setIsRefiningLocation(false);
+    }
+  };
+
   const renderStep2 = () => (
     <View>
-      <Text style={styles.label}>Fecha y Hora</Text>
-      <View style={styles.rowInput}>
-        <Calendar size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-        <TextInput 
-          style={styles.inputNoBorder} 
-          placeholder="Seleccionar fecha"
-          placeholderTextColor={COLORS.textSecondary}
-        />
+      <EventDateTimePicker
+        value={selectedDateTime}
+        onChange={(date, formatted) => {
+          setSelectedDateTime(date);
+          setDateText(formatted);
+        }}
+      />
+
+      <Text style={styles.label}>Tipo de evento</Text>
+      <View style={styles.typeToggleRow}>
+        <TouchableOpacity
+          style={[
+            styles.typeChip,
+            eventType === 'presencial' && styles.typeChipSelected,
+          ]}
+          onPress={() => handleEventTypeChange('presencial')}
+        >
+          <Text
+            style={[
+              styles.typeChipText,
+              eventType === 'presencial' && styles.typeChipTextSelected,
+            ]}
+          >
+            Presencial
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.typeChip,
+            eventType === 'virtual' && styles.typeChipSelected,
+          ]}
+          onPress={() => handleEventTypeChange('virtual')}
+        >
+          <Text
+            style={[
+              styles.typeChipText,
+              eventType === 'virtual' && styles.typeChipTextSelected,
+            ]}
+          >
+            Virtual
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <Text style={styles.label}>Ubicación</Text>
-      <View style={styles.rowInput}>
-        <MapPin size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-        <TextInput 
-          style={styles.inputNoBorder} 
-          placeholder="Buscar dirección"
-          placeholderTextColor={COLORS.textSecondary}
-        />
-      </View>
-
-      <View style={styles.mapPlaceholder}>
-        <Text style={styles.mapText}>Mapa Preview</Text>
-      </View>
+      {eventType === 'virtual' ? (
+        <>
+          <Text style={styles.label}>Enlace del evento</Text>
+          <View style={styles.rowInput}>
+            <TextInput
+              style={styles.inputNoBorder}
+              placeholder="Ej. enlace de Zoom o Google Meet"
+              placeholderTextColor={COLORS.textSecondary}
+              value={virtualLink}
+              onChangeText={setVirtualLink}
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          <Text style={styles.label}>Ubicación</Text>
+          <View style={styles.locationInputWrapper}>
+            <View style={styles.rowInput}>
+              <MapPin size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+              <View style={styles.inputNoBorderContainer}>
+                <TextInput 
+                  style={styles.inputNoBorder} 
+                  placeholder="Buscar dirección"
+                  placeholderTextColor={COLORS.textSecondary}
+                  value={locationQuery}
+                  onChangeText={(text) => {
+                    setLocationQuery(text);
+                    if (geocodeError) {
+                      setGeocodeError('');
+                    }
+                    if (isRefiningLocation) {
+                      setIsRefiningLocation(false);
+                    }
+                    if (!GOOGLE_MAPS_API_KEY) {
+                      setLocationSuggestions([]);
+                      return;
+                    }
+                    if (suggestionsTimeout.current) {
+                      clearTimeout(suggestionsTimeout.current);
+                    }
+                    const trimmed = text.trim();
+                    if (trimmed.length < 2) {
+                      setLocationSuggestions([]);
+                      return;
+                    }
+                    suggestionsTimeout.current = setTimeout(async () => {
+                      try {
+                        const encoded = encodeURIComponent(trimmed);
+                        const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encoded}&key=${GOOGLE_MAPS_API_KEY}&language=es`;
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        if (data.status === 'OK' && data.predictions) {
+                          setLocationSuggestions(data.predictions);
+                        } else if (data.status === 'ZERO_RESULTS') {
+                          setLocationSuggestions([]);
+                        } else {
+                          setLocationSuggestions([]);
+                        }
+                      } catch (error) {
+                        setLocationSuggestions([]);
+                      }
+                    }, 400);
+                  }}
+                  onSubmitEditing={() => handleSearchLocation()}
+                />
+              </View>
+              <TouchableOpacity style={styles.searchButton} onPress={handleClearLocationInput}>
+                <Text style={styles.searchButtonText}>Limpiar</Text>
+              </TouchableOpacity>
+            </View>
+            {locationSuggestions.length > 0 && (
+              <View style={styles.locationSuggestionsContainer}>
+                {locationSuggestions.map((item) => (
+                  <TouchableOpacity
+                    key={item.place_id}
+                    style={styles.locationSuggestionItem}
+                    onPress={() => {
+                      const description = item.description;
+                      setLocationQuery(description);
+                      setLocationAddress(description);
+                      setLocationSuggestions([]);
+                      handleSearchLocation(description);
+                    }}
+                  >
+                    <Text style={styles.locationSuggestionMainText}>
+                      {item.structured_formatting?.main_text || item.description}
+                    </Text>
+                    {item.structured_formatting?.secondary_text ? (
+                      <Text style={styles.locationSuggestionSecondaryText}>
+                        {item.structured_formatting.secondary_text}
+                      </Text>
+                    ) : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+          {locationAddress ? (
+            <Text style={styles.locationHelperText}>{locationAddress}</Text>
+          ) : null}
+          {geocodeError ? (
+            <Text style={styles.locationErrorText}>{geocodeError}</Text>
+          ) : null}
+          {(locationAddress || selectedCoordinate) ? (
+            <View style={styles.refineLocationContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.refineLocationButton,
+                  isRefiningLocation && {
+                    backgroundColor: COLORS.primary,
+                    borderColor: COLORS.primary,
+                  },
+                ]}
+                onPress={() => {
+                   if (!isRefiningLocation) {
+                     setOriginalCoordinate(selectedCoordinate);
+                     setIsRefiningLocation(true);
+                   } else {
+                     setIsRefiningLocation(false);
+                     setOriginalCoordinate(null);
+                   }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.refineLocationButtonText,
+                    isRefiningLocation && { color: COLORS.surface },
+                  ]}
+                >
+                  {isRefiningLocation ? 'Guardar ubicación exacta' : 'Mejorar precisión de ubicación'}
+                </Text>
+              </TouchableOpacity>
+              
+              {isRefiningLocation && (
+                <TouchableOpacity
+                  style={styles.cancelRefineButton}
+                  onPress={() => {
+                    setIsRefiningLocation(false);
+                    if (originalCoordinate) {
+                      setSelectedCoordinate(originalCoordinate);
+                      setMapRegion(prev => ({
+                        ...prev,
+                        latitude: originalCoordinate.latitude,
+                        longitude: originalCoordinate.longitude,
+                      }));
+                    }
+                    setOriginalCoordinate(null);
+                  }}
+                >
+                  <Text style={styles.cancelRefineButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+          <View style={[styles.mapContainer, { zIndex: 1 }]}>
+            <EventMap
+              style={styles.map}
+              initialRegion={mapRegion}
+              region={mapRegion}
+              markerCoordinate={selectedCoordinate}
+              interactive
+              googleMapsApiKey={GOOGLE_MAPS_API_KEY || undefined}
+              onPress={handleMapPress}
+              draggable={true}
+              onMarkerDragEnd={handleMapPress}
+              onRegionChangeComplete={handleRegionChangeComplete}
+            />
+            {isRefiningLocation && (
+              <View pointerEvents="none" style={styles.mapCenterMarker}>
+                <MapPin size={28} color={COLORS.primary} />
+              </View>
+            )}
+            {isGeocoding && (
+              <View style={styles.mapLoadingOverlay}>
+                <ActivityIndicator color={COLORS.surface} />
+              </View>
+            )}
+          </View>
+        </>
+      )}
     </View>
   );
 
@@ -284,6 +678,26 @@ export default function CreateEventScreen({ navigation }) {
     </View>
   );
 
+  const buildEventPayload = () => {
+    const payload = {
+      title,
+      category: selectedCategory,
+      description,
+      date: dateText,
+      type: eventType,
+      isVirtual: eventType === 'virtual',
+      location: locationAddress || locationQuery,
+      locationAddress: locationAddress || locationQuery,
+      latitude: selectedCoordinate ? selectedCoordinate.latitude : undefined,
+      longitude: selectedCoordinate ? selectedCoordinate.longitude : undefined,
+      virtualLink: virtualLink || undefined,
+    };
+    if (initialEvent && initialEvent.id) {
+      payload.id = initialEvent.id;
+    }
+    return payload;
+  };
+
   const handleNext = () => {
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -307,13 +721,13 @@ export default function CreateEventScreen({ navigation }) {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Crear Evento</Text>
+        <Text style={styles.headerTitle}>{mode === 'edit' ? 'Editar Evento' : 'Crear Evento'}</Text>
         <View style={{ width: 40 }} /> 
       </View>
 
       {renderProgressBar()}
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="always">
         {currentStep === 0 && renderStep1()}
         {currentStep === 1 && renderStep2()}
         {currentStep === 2 && renderStep3()}
@@ -329,8 +743,17 @@ export default function CreateEventScreen({ navigation }) {
             </TouchableOpacity>
             
             {title.length > 0 && (
-              <TouchableOpacity style={[styles.nextButton, styles.flexCreateButton, styles.createButton]} onPress={() => navigation.goBack()}>
-                <Text style={styles.nextButtonText}>Crear</Text>
+            <TouchableOpacity
+              style={[styles.nextButton, styles.flexCreateButton, styles.createButton]}
+              onPress={() => {
+                const payload = buildEventPayload();
+                if (onSubmit && typeof onSubmit === 'function') {
+                  onSubmit(payload);
+                }
+                navigation.goBack();
+              }}
+            >
+                <Text style={styles.nextButtonText}>{mode === 'edit' ? 'Guardar' : 'Crear'}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -434,6 +857,11 @@ const styles = StyleSheet.create({
   categoryContainerCollapsed: {
     // marginTop: SIZES.s,
   },
+  categorySearchContainer: {
+    marginTop: SIZES.s,
+    marginBottom: SIZES.s,
+    justifyContent: 'center',
+  },
   categorySearchInput: {
     backgroundColor: COLORS.surface,
     paddingHorizontal: SIZES.m,
@@ -443,8 +871,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     ...FONTS.body,
     color: COLORS.text,
-    marginTop: SIZES.s,
-    marginBottom: SIZES.s,
+    paddingRight: 40,
+  },
+  clearSearchButton: {
+    position: 'absolute',
+    right: 10,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   expandButton: {
     paddingHorizontal: SIZES.s,
@@ -519,21 +953,151 @@ const styles = StyleSheet.create({
   inputIcon: {
     marginRight: SIZES.s,
   },
+  inputNoBorderContainer: {
+    flex: 1,
+  },
   inputNoBorder: {
-    // flex: 1,
-    // ...FONTS.body,
-    // color: COLORS.text,
-    // height: '100%',
-
+    flex: 1,
     backgroundColor: COLORS.surface,
     paddingLeft: SIZES.m,
     paddingVertical: SIZES.s,
     borderRadius: SIZES.radius,
-    width: '100%',
-    // borderColor: COLORS.border,
     ...FONTS.body,
     color: COLORS.text,
     outlineStyle: 'none', // Disable focus outline
+  },
+  typeToggleRow: {
+    flexDirection: 'row',
+    marginTop: SIZES.s,
+  },
+  typeChip: {
+    paddingHorizontal: SIZES.m,
+    paddingVertical: SIZES.s,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    marginRight: SIZES.s,
+  },
+  typeChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  typeChipText: {
+    ...FONTS.caption,
+    color: COLORS.text,
+  },
+  typeChipTextSelected: {
+    color: COLORS.surface,
+  },
+  searchButton: {
+    flexShrink: 0,
+    marginLeft: SIZES.s,
+    paddingHorizontal: SIZES.m,
+    paddingVertical: SIZES.xs,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchButtonText: {
+    ...FONTS.caption,
+    color: COLORS.surface,
+  },
+  locationHelperText: {
+    marginTop: SIZES.xs,
+    ...FONTS.caption,
+    color: COLORS.textSecondary,
+  },
+  locationErrorText: {
+    marginTop: SIZES.xs,
+    ...FONTS.caption,
+    color: COLORS.error,
+  },
+  locationInputWrapper: {
+    marginBottom: SIZES.s,
+  },
+  locationSuggestionsContainer: {
+    marginTop: 4,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+    maxHeight: 180,
+  },
+  locationSuggestionItem: {
+    paddingHorizontal: SIZES.m,
+    paddingVertical: SIZES.xs,
+  },
+  locationSuggestionMainText: {
+    ...FONTS.body,
+    color: COLORS.text,
+  },
+  locationSuggestionSecondaryText: {
+    ...FONTS.caption,
+    color: COLORS.textSecondary,
+  },
+  refineLocationContainer: {
+    marginTop: SIZES.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.s,
+  },
+  refineLocationButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: SIZES.s,
+    paddingVertical: SIZES.xs,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  cancelRefineButton: {
+    paddingHorizontal: SIZES.s,
+    paddingVertical: SIZES.xs,
+    borderRadius: 20,
+    backgroundColor: COLORS.error + '20', // Light red background
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  cancelRefineButtonText: {
+    ...FONTS.caption,
+    color: COLORS.error,
+    fontSize: 12,
+  },
+  refineLocationButtonText: {
+    ...FONTS.caption,
+    color: COLORS.primary,
+    fontSize: 12,
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: SIZES.radius,
+    overflow: 'hidden',
+    marginTop: SIZES.m,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+  },
+  mapLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapCenterMarker: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [
+      { translateX: -14 },
+      { translateY: -28 },
+    ],
   },
   mapPlaceholder: {
     height: 150,

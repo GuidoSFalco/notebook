@@ -61,15 +61,14 @@ const EventCard = ({ event, onPress, layout = 'vertical' }) => {
               {event.location}
             </Text>
           </View>
-          <View style={styles.attendeesContainer}>
+          {/* <View style={styles.attendeesContainer}>
             <View style={styles.avatarStack}>
-               {/* Dummy Avatars */}
                {[1,2,3].map((_, i) => (
                  <View key={i} style={[styles.miniAvatar, { left: i * -10, zIndex: 3-i }]} />
                ))}
             </View>
             <Text style={styles.attendeesText}>+{event.attendees}</Text>
-          </View>
+          </View> */}
         </View>
       </View>
     </TouchableOpacity>
@@ -162,6 +161,7 @@ const styles = StyleSheet.create({
     ...FONTS.caption,
     color: COLORS.textSecondary,
     marginLeft: -10,
+    zIndex: 1000
   },
 
   // Horizontal (Small)

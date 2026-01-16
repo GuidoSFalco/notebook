@@ -18,9 +18,13 @@ export default function AppNavigator() {
           component={EventDetailScreen} 
           options={{ presentation: 'modal' }}
         />
-        {/* We can also have CreateEvent as a modal here if we want it separate from tabs */}
         <Stack.Screen 
           name="CreateEvent" 
+          component={CreateEventScreen} 
+          options={{ presentation: 'modal' }}
+        />
+        <Stack.Screen 
+          name="EditEvent" 
           component={CreateEventScreen} 
           options={{ presentation: 'modal' }}
         />

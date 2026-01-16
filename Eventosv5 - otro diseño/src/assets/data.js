@@ -5,6 +5,9 @@ export const EVENTS = [
     title: 'Neon Summer Festival',
     date: 'Vie, 12 Ago • 20:00',
     location: 'Playa Waikiki',
+    locationAddress: 'Playa Waikiki, Lima, Perú',
+    latitude: -12.1328,
+    longitude: -77.029,
     image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80',
     price: '$25.00',
     organizer: {
@@ -50,6 +53,9 @@ export const EVENTS = [
     title: 'Clase de Yoga al Atardecer',
     date: 'Dom, 14 Ago • 17:00',
     location: 'Parque Central',
+    locationAddress: 'Parque Central, Ciudad',
+    latitude: -34.6037,
+    longitude: -58.3816,
     image: 'https://images.unsplash.com/photo-1588286840104-8957b019727f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80',
     price: '$10.00',
     organizer: {
