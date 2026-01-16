@@ -3,10 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../constants/theme';
-import { ArrowLeft, ArrowRight, Upload, Calendar, MapPin, DollarSign, X } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Upload, Calendar, MapPin, DollarSign, X, Edit2, Trash2 } from 'lucide-react-native';
 import { GOOGLE_MAPS_API_KEY } from '../config/mapsConfig';
 import EventMap from '../components/EventMap';
 import EventDateTimePicker from '../components/EventDateTimePicker';
+import * as ImagePicker from 'expo-image-picker';
 
 const STEPS = ['Detalles', 'Ubicación', 'Tickets'];
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -24,6 +25,7 @@ export default function CreateEventScreen({ navigation, route }) {
   const [locationQuery, setLocationQuery] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
   const [virtualLink, setVirtualLink] = useState('');
+  const [coverImage, setCoverImage] = useState(null);
   const [mapRegion, setMapRegion] = useState({
     latitude: -34.6037,
     longitude: -58.3816,
@@ -67,6 +69,7 @@ export default function CreateEventScreen({ navigation, route }) {
       setSelectedCategory(initialEvent.category || null);
       setDescription(initialEvent.description || '');
       setDateText(initialEvent.date || '');
+      setCoverImage(initialEvent.image || null);
       if (initialEvent.type === 'virtual' || initialEvent.isVirtual) {
         setEventType('virtual');
       } else {
@@ -417,6 +420,26 @@ export default function CreateEventScreen({ navigation, route }) {
     }
   };
 
+  const handlePickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setCoverImage(result.assets[0].uri);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setCoverImage(null);
+  };
+
   const handleClearLocationInput = () => {
     setLocationQuery('');
     setLocationSuggestions([]);
@@ -660,16 +683,40 @@ export default function CreateEventScreen({ navigation, route }) {
   const renderStep3 = () => (
     <View>
       <Text style={styles.label}>Imagen de Portada</Text>
-      <TouchableOpacity style={styles.uploadBox}>
-        <Upload size={32} color={COLORS.primary} />
-        <Text style={styles.uploadText}>Subir imagen</Text>
-      </TouchableOpacity>
+      {coverImage ? (
+        <View style={styles.coverImageContainer}>
+          <View style={styles.coverImageWrapper}>
+            <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
+          </View>
+          <View style={styles.coverImageActions}>
+            <TouchableOpacity
+              style={[styles.coverImageActionButton, styles.changeImageButton]}
+              onPress={handlePickImage}
+            >
+              <Edit2 size={16} color={COLORS.primary} />
+              <Text style={[styles.coverImageActionText, styles.changeImageText]}>Cambiar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.coverImageActionButton, styles.removeImageButton]}
+              onPress={handleRemoveImage}
+            >
+              <Trash2 size={16} color={COLORS.error} />
+              <Text style={[styles.coverImageActionText, styles.removeImageText]}>Quitar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.uploadBox} onPress={handlePickImage}>
+          <Upload size={32} color={COLORS.primary} />
+          <Text style={styles.uploadText}>Subir imagen</Text>
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.label}>Precio del Ticket</Text>
       <View style={styles.rowInput}>
         <DollarSign size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-        <TextInput 
-          style={styles.inputNoBorder} 
+        <TextInput
+          style={styles.inputNoBorder}
           placeholder="0.00"
           keyboardType="numeric"
           placeholderTextColor={COLORS.textSecondary}
@@ -691,6 +738,7 @@ export default function CreateEventScreen({ navigation, route }) {
       latitude: selectedCoordinate ? selectedCoordinate.latitude : undefined,
       longitude: selectedCoordinate ? selectedCoordinate.longitude : undefined,
       virtualLink: virtualLink || undefined,
+      image: coverImage || (initialEvent && initialEvent.image) || undefined,
     };
     if (initialEvent && initialEvent.id) {
       payload.id = initialEvent.id;
@@ -735,16 +783,60 @@ export default function CreateEventScreen({ navigation, route }) {
 
       {/* Footer */}
       <View style={styles.footer}>
-        {/* {currentStep === 0 ? ( */}
-          <View style={styles.footerButtonsRow}>
-            <TouchableOpacity style={[styles.nextButton, styles.flexNextButton]} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>Siguiente</Text>
-              <ArrowRight size={20} color={COLORS.surface} style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
-            
-            {title.length > 0 && (
+        <View style={styles.footerButtonsRow}>
+          {currentStep !== STEPS.length - 1 ? (
+            <>
+              <TouchableOpacity
+                style={[styles.nextButton, styles.flexNextButton]}
+                onPress={handleNext}
+              >
+                <Text style={styles.nextButtonText}>Siguiente</Text>
+                <ArrowRight
+                  size={20}
+                  color={COLORS.surface}
+                  style={{ marginLeft: 8 }}
+                />
+              </TouchableOpacity>
+
+              {title.trim().length > 0 && (
+                <TouchableOpacity
+                  style={[
+                    styles.nextButton,
+                    styles.flexCreateButton,
+                    styles.createButton,
+                  ]}
+                  onPress={() => {
+                    const payload = buildEventPayload();
+                    if (onSubmit && typeof onSubmit === 'function') {
+                      onSubmit(payload);
+                    }
+                    navigation.goBack();
+                  }}
+                >
+                  <Text style={styles.nextButtonText}>
+                    {mode === 'edit' ? 'Guardar' : 'Crear'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : title.trim().length === 0 ? (
             <TouchableOpacity
-              style={[styles.nextButton, styles.flexCreateButton, styles.createButton]}
+              style={[
+                styles.nextButton,
+                styles.flexNextButton,
+                styles.missingNameButton,
+              ]}
+              onPress={() => {
+                setCurrentStep(0);
+              }}
+            >
+              <Text style={styles.nextButtonText}>
+                Falta completar el nombre del evento
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.nextButton, styles.flexNextButton, styles.createButton]}
               onPress={() => {
                 const payload = buildEventPayload();
                 if (onSubmit && typeof onSubmit === 'function') {
@@ -753,20 +845,17 @@ export default function CreateEventScreen({ navigation, route }) {
                 navigation.goBack();
               }}
             >
-                <Text style={styles.nextButtonText}>{mode === 'edit' ? 'Guardar' : 'Crear'}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        {/* ) : (
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>
-              {currentStep === STEPS.length - 1 ? 'Publicar Evento' : 'Siguiente'}
-            </Text>
-            {currentStep < STEPS.length - 1 && (
-              <ArrowRight size={20} color={COLORS.surface} style={{ marginLeft: 8 }} />
-            )}
-          </TouchableOpacity>
-        )} */}
+              <Text style={styles.nextButtonText}>
+                {mode === 'edit' ? 'Guardar' : 'Crear'}
+              </Text>
+              <Upload
+                size={20}
+                color={COLORS.surface}
+                style={{ marginLeft: 8 }}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -794,6 +883,9 @@ const styles = StyleSheet.create({
   },
   createButton: {
     backgroundColor: COLORS.success,
+  },
+  missingNameButton: {
+    backgroundColor: COLORS.error,
   },
   header: {
     flexDirection: 'row',
@@ -1126,6 +1218,54 @@ const styles = StyleSheet.create({
     marginTop: SIZES.s,
     ...FONTS.caption,
     fontWeight: '600',
+  },
+  coverImageContainer: {
+    marginBottom: SIZES.s,
+  },
+  coverImageWrapper: {
+    height: 150,
+    borderRadius: SIZES.radius,
+    overflow: 'hidden',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverImageActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SIZES.s,
+    marginTop: SIZES.s,
+  },
+  coverImageActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: SIZES.m,
+    paddingVertical: SIZES.xs,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+  },
+  changeImageButton: {
+    borderColor: COLORS.primary,
+  },
+  removeImageButton: {
+    borderColor: COLORS.error,
+  },
+  coverImageActionText: {
+    ...FONTS.caption,
+    fontWeight: '600',
+  },
+  changeImageText: {
+    color: COLORS.primary,
+  },
+  removeImageText: {
+    color: COLORS.error,
   },
   footer: {
     padding: SIZES.l,
