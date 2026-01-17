@@ -1,19 +1,27 @@
 
 import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
 import { Settings, LogOut, Ticket, Heart, Calendar } from 'lucide-react-native';
 
 const MENU_ITEMS = [
   { icon: Ticket, label: 'Mis Tickets', badge: 2 },
-  { icon: Heart, label: 'Guardados', badge: 5 },
-  { icon: Calendar, label: 'Mis Eventos', badge: 1 },
-  { icon: Settings, label: 'Configuración' },
+  { icon: Heart, label: 'Guardados', badge: 5, route: 'SavedEvents' },
+  { icon: Calendar, label: 'Mis Eventos', badge: 1, route: 'MyEvents' },
+  { icon: Settings, label: 'Configuración', route: 'Settings' },
   { icon: LogOut, label: 'Cerrar Sesión', color: COLORS.error },
 ];
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
+  const handleNavigation = (item) => {
+    if (item.route) {
+      navigation.navigate(item.route);
+    } else {
+      Alert.alert("Próximamente", "Esta funcionalidad estará disponible pronto.");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -56,7 +64,11 @@ export default function ProfileScreen() {
         {/* Menu */}
         <View style={styles.menuContainer}>
           {MENU_ITEMS.map((item, index) => (
-            <TouchableOpacity key={index} style={styles.menuItem}>
+            <TouchableOpacity 
+              key={index} 
+              style={styles.menuItem}
+              onPress={() => handleNavigation(item)}
+            >
               <View style={[styles.menuIconBox, item.color && { backgroundColor: 'rgba(227, 52, 47, 0.1)' }]}>
                 <item.icon size={24} color={item.color || COLORS.primary} />
               </View>

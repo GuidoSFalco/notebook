@@ -21,6 +21,9 @@ export default function CreateEventScreen({ navigation, route }) {
   const [description, setDescription] = useState('');
   const [dateText, setDateText] = useState('');
   const [selectedDateTime, setSelectedDateTime] = useState(null);
+  const [endDateText, setEndDateText] = useState('');
+  const [selectedEndDateTime, setSelectedEndDateTime] = useState(null);
+  const [hasEndDate, setHasEndDate] = useState(false);
   const [eventType, setEventType] = useState('presencial');
   const [locationQuery, setLocationQuery] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
@@ -40,8 +43,8 @@ export default function CreateEventScreen({ navigation, route }) {
   const [originalCoordinate, setOriginalCoordinate] = useState(null);
   const suggestionsTimeout = useRef(null);
 
-  const mode = route?.params?.mode === 'edit' ? 'edit' : 'create';
   const initialEvent = route?.params?.event || null;
+  const mode = route?.params?.mode === 'edit' || initialEvent ? 'edit' : 'create';
   const onSubmit = route?.params?.onSubmit;
 
   const inputAnimation = useRef(new Animated.Value(0)).current;
@@ -69,6 +72,10 @@ export default function CreateEventScreen({ navigation, route }) {
       setSelectedCategory(initialEvent.category || null);
       setDescription(initialEvent.description || '');
       setDateText(initialEvent.date || '');
+      if (initialEvent.endDate) {
+        setEndDateText(initialEvent.endDate);
+        setHasEndDate(true);
+      }
       setCoverImage(initialEvent.image || null);
       if (initialEvent.type === 'virtual' || initialEvent.isVirtual) {
         setEventType('virtual');
@@ -454,11 +461,20 @@ export default function CreateEventScreen({ navigation, route }) {
   const renderStep2 = () => (
     <View>
       <EventDateTimePicker
-        value={selectedDateTime}
-        onChange={(date, formatted) => {
+        startDate={selectedDateTime}
+        startDateText={dateText}
+        onStartDateChange={(date, formatted) => {
           setSelectedDateTime(date);
           setDateText(formatted);
         }}
+        endDate={selectedEndDateTime}
+        endDateText={endDateText}
+        onEndDateChange={(date, formatted) => {
+          setSelectedEndDateTime(date);
+          setEndDateText(formatted);
+        }}
+        hasEndDate={hasEndDate}
+        onToggleEndDate={setHasEndDate}
       />
 
       <Text style={styles.label}>Tipo de evento</Text>
@@ -731,6 +747,7 @@ export default function CreateEventScreen({ navigation, route }) {
       category: selectedCategory,
       description,
       date: dateText,
+      endDate: hasEndDate ? endDateText : null,
       type: eventType,
       isVirtual: eventType === 'virtual',
       location: locationAddress || locationQuery,

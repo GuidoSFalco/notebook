@@ -5,6 +5,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
 import EventDetailScreen from '../screens/EventDetailScreen';
 import CreateEventScreen from '../screens/CreateEventScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import MyEventsScreen from '../screens/MyEventsScreen';
+import SavedEventsScreen from '../screens/SavedEventsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +31,9 @@ export default function AppNavigator() {
           component={CreateEventScreen} 
           options={{ presentation: 'modal' }}
         />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="MyEvents" component={MyEventsScreen} />
+        <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

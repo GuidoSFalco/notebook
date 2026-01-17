@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   StyleSheet,
+  Switch,
 } from 'react-native';
 import { COLORS, FONTS, SIZES } from '../constants/theme';
 import { Calendar, ArrowLeft, ArrowRight } from 'lucide-react-native';
@@ -133,26 +134,51 @@ function parseTimeFromText(text) {
 }
 
 export default function EventDateTimePicker({
-  value,
-  onChange,
+  startDate,
+  startDateText,
+  onStartDateChange,
+  endDate,
+  endDateText,
+  onEndDateChange,
+  hasEndDate,
+  onToggleEndDate,
   label = 'Fecha y Hora',
   placeholder = 'Seleccionar fecha y hora',
 }) {
   const [visible, setVisible] = useState(false);
+  const [activePicker, setActivePicker] = useState('start'); // 'start' | 'end'
+  
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [timeText, setTimeText] = useState('');
-  const [displayText, setDisplayText] = useState('');
+  
+  const [displayStartText, setDisplayStartText] = useState('');
+  const [displayEndText, setDisplayEndText] = useState('');
+  
   const [timeError, setTimeError] = useState('');
 
+  // Sync Start Date Text
   useEffect(() => {
-    if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      setMonth(value);
-      setSelectedDate(value);
-      setTimeText(formatTimeHHMM(value));
-      setDisplayText(formatDateTimeSpanish(value));
+    if (startDate instanceof Date && !Number.isNaN(startDate.getTime())) {
+      setMonth(startDate);
+      setDisplayStartText(formatDateTimeSpanish(startDate));
+    } else if (startDateText) {
+       setDisplayStartText(startDateText);
+    } else {
+       setDisplayStartText('');
     }
-  }, [value]);
+  }, [startDate, startDateText]);
+
+  // Sync End Date Text
+  useEffect(() => {
+    if (endDate instanceof Date && !Number.isNaN(endDate.getTime())) {
+      setDisplayEndText(formatDateTimeSpanish(endDate));
+    } else if (endDateText) {
+       setDisplayEndText(endDateText);
+    } else {
+       setDisplayEndText('');
+    }
+  }, [endDate, endDateText]);
 
   const monthLabel = `${MONTH_NAMES[month.getMonth()]} ${month.getFullYear()}`;
   const monthStart = startOfMonthLocal(month);
@@ -162,8 +188,24 @@ export default function EventDateTimePicker({
     days.push(addDaysLocal(gridStart, i));
   }
 
-  const handleOpen = () => {
-    const base = value instanceof Date && !Number.isNaN(value.getTime()) ? value : new Date();
+  const handleOpen = (type) => {
+    setActivePicker(type);
+    let base = new Date();
+    
+    if (type === 'start') {
+      if (startDate instanceof Date && !Number.isNaN(startDate.getTime())) {
+        base = startDate;
+      }
+    } else {
+      if (endDate instanceof Date && !Number.isNaN(endDate.getTime())) {
+        base = endDate;
+      } else if (startDate instanceof Date && !Number.isNaN(startDate.getTime())) {
+        // Default end date to start date + 1 hour or same day
+        base = new Date(startDate);
+        base.setHours(base.getHours() + 1);
+      }
+    }
+
     setMonth(base);
     setSelectedDate(base);
     setTimeText(formatTimeHHMM(base));
@@ -177,32 +219,90 @@ export default function EventDateTimePicker({
       setTimeError('Horario inválido. Usa el formato HH:MM');
       return;
     }
-    const date = new Date(selectedDate);
-    date.setHours(parsed.hours, parsed.minutes, 0, 0);
-    const formatted = formatDateTimeSpanish(date);
-    setDisplayText(formatted);
-    setVisible(false);
-    if (onChange) {
-      onChange(date, formatted);
+    const newDate = new Date(selectedDate);
+    newDate.setHours(parsed.hours, parsed.minutes, 0, 0);
+    const formatted = formatDateTimeSpanish(newDate);
+
+    // Validation
+    if (activePicker === 'end') {
+      // Must be after startDate
+      // If startDate is set (as Date object)
+      if (startDate instanceof Date && !Number.isNaN(startDate.getTime())) {
+        if (newDate <= startDate) {
+           setTimeError('La fecha de finalización debe ser posterior al inicio.');
+           return;
+        }
+      }
+      if (onEndDateChange) {
+        onEndDateChange(newDate, formatted);
+      }
+    } else {
+      // Active is start
+      // If endDate is set, check if start < end
+      if (hasEndDate && endDate instanceof Date && !Number.isNaN(endDate.getTime())) {
+         if (newDate >= endDate) {
+             // Just allow it, user might fix end date later.
+         }
+      }
+      if (onStartDateChange) {
+        onStartDateChange(newDate, formatted);
+      }
     }
+
+    setVisible(false);
   };
 
   return (
     <>
       <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity activeOpacity={0.8} onPress={handleOpen}>
+      
+      {/* Start Date Picker */}
+      <TouchableOpacity activeOpacity={0.8} onPress={() => handleOpen('start')}>
         <View style={styles.fieldRow}>
           <Calendar size={20} color={COLORS.textSecondary} style={styles.fieldIcon} />
           <Text
             style={[
               styles.fieldText,
-              !displayText && styles.fieldPlaceholder,
+              !displayStartText && styles.fieldPlaceholder,
             ]}
           >
-            {displayText || placeholder}
+            {displayStartText || placeholder}
           </Text>
         </View>
       </TouchableOpacity>
+
+      {/* Toggle End Date */}
+      <View style={styles.switchRow}>
+        <Text style={styles.switchLabel}>Agregar fecha y hora de finalización</Text>
+        <Switch
+          value={hasEndDate}
+          onValueChange={(val) => {
+             if (onToggleEndDate) onToggleEndDate(val);
+             if (!val && onEndDateChange) {
+                onEndDateChange(null, '');
+             }
+          }}
+          trackColor={{ false: '#767577', true: COLORS.primary }}
+          thumbColor={hasEndDate ? '#fff' : '#f4f3f4'}
+        />
+      </View>
+
+      {/* End Date Picker */}
+      {hasEndDate && (
+        <TouchableOpacity activeOpacity={0.8} onPress={() => handleOpen('end')}>
+          <View style={[styles.fieldRow, { marginTop: 8 }]}>
+            <Calendar size={20} color={COLORS.textSecondary} style={styles.fieldIcon} />
+            <Text
+              style={[
+                styles.fieldText,
+                !displayEndText && styles.fieldPlaceholder,
+              ]}
+            >
+              {displayEndText || 'Seleccionar fecha de finalización'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       <Modal
         transparent
@@ -341,6 +441,18 @@ const styles = StyleSheet.create({
   fieldPlaceholder: {
     color: COLORS.textSecondary,
   },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SIZES.m,
+    marginBottom: SIZES.xs,
+  },
+  switchLabel: {
+    ...FONTS.body,
+    color: COLORS.text,
+    fontSize: 14,
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -464,4 +576,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

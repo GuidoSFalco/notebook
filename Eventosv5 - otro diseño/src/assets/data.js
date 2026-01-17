@@ -4,6 +4,7 @@ export const EVENTS = [
     id: '1',
     title: 'Neon Summer Festival',
     date: 'Vie, 12 Ago • 20:00',
+    endDate: 'Vie, 12 Ago • 23:59',
     location: 'Playa Waikiki',
     locationAddress: 'Playa Waikiki, Lima, Perú',
     latitude: -12.1328,

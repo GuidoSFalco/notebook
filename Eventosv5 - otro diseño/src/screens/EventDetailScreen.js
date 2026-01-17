@@ -62,7 +62,9 @@ export default function EventDetailScreen({ route, navigation }) {
             <Text style={styles.title}>{event.title}</Text>
             <View style={styles.row}>
               <Calendar size={16} color={COLORS.surface} />
-              <Text style={styles.dateText}>{event.date}</Text>
+              <Text style={styles.dateText}>
+                {event.endDate ? `${event.date} - ${event.endDate}` : event.date}
+              </Text>
             </View>
           </View>
         </View>
