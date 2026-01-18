@@ -2,8 +2,10 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Platform, StyleSheet } from 'react-native';
-import { Home, User, PlusCircle, Plus } from 'lucide-react-native';
+import { Home, User, PlusCircle, Plus, Map, Calendar } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
+import MapScreen from '../screens/MapScreen';
+import MyEventsScreen from '../screens/MyEventsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import CreateEventScreen from '../screens/CreateEventScreen';
 import { COLORS, SHADOWS } from '../constants/theme';
@@ -53,6 +55,15 @@ export default function BottomTabNavigator() {
         }}
       />
       <Tab.Screen 
+        name="MapTab" 
+        component={MapScreen} 
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Map color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen 
         name="CreateEventTab" 
         component={CreateEventScreen} // Dummy component, won't be shown
         listeners={({ navigation }) => ({
@@ -67,6 +78,15 @@ export default function BottomTabNavigator() {
           ),
           tabBarButton: (props) => (
             <CustomTabBarButton {...props} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="MyEventsTab" 
+        component={MyEventsScreen} 
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Calendar color={color} size={size} />
           ),
         }}
       />

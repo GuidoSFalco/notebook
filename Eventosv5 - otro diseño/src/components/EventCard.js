@@ -5,11 +5,11 @@ import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
 import { MapPin, Calendar, Heart } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const EventCard = ({ event, onPress, layout = 'vertical' }) => {
+const EventCard = ({ event, onPress, layout = 'vertical', style }) => {
   if (layout === 'horizontal') {
     return (
       <TouchableOpacity 
-        style={styles.cardHorizontal} 
+        style={[styles.cardHorizontal, style]} 
         onPress={onPress}
         activeOpacity={0.9}
       >
@@ -29,7 +29,7 @@ const EventCard = ({ event, onPress, layout = 'vertical' }) => {
   // Vertical Large Card (Featured)
   return (
     <TouchableOpacity 
-      style={styles.cardVertical} 
+      style={[styles.cardVertical, style]} 
       onPress={onPress}
       activeOpacity={0.9}
     >

@@ -25,6 +25,8 @@ export default function CreateEventScreen({ navigation, route }) {
   const [selectedEndDateTime, setSelectedEndDateTime] = useState(null);
   const [hasEndDate, setHasEndDate] = useState(false);
   const [eventType, setEventType] = useState('presencial');
+  const [visibility, setVisibility] = useState('public');
+  const [authorizedUsers, setAuthorizedUsers] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
   const [virtualLink, setVirtualLink] = useState('');
@@ -82,6 +84,8 @@ export default function CreateEventScreen({ navigation, route }) {
       } else {
         setEventType('presencial');
       }
+      setVisibility(initialEvent.visibility || 'public');
+      setAuthorizedUsers(initialEvent.authorizedUsers ? initialEvent.authorizedUsers.join(', ') : '');
       const initialAddress = initialEvent.locationAddress || initialEvent.location || '';
       setLocationAddress(initialAddress);
       setLocationQuery(initialAddress);
@@ -313,6 +317,58 @@ export default function CreateEventScreen({ navigation, route }) {
           value={description}
           onChangeText={setDescription}
         />
+
+        <Text style={styles.label}>Visibilidad</Text>
+        <View style={styles.typeToggleRow}>
+          <TouchableOpacity
+            style={[
+              styles.typeChip,
+              visibility === 'public' && styles.typeChipSelected,
+            ]}
+            onPress={() => setVisibility('public')}
+          >
+            <Text
+              style={[
+                styles.typeChipText,
+                visibility === 'public' && styles.typeChipTextSelected,
+              ]}
+            >
+              Público
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.typeChip,
+              visibility === 'private' && styles.typeChipSelected,
+            ]}
+            onPress={() => setVisibility('private')}
+          >
+            <Text
+              style={[
+                styles.typeChipText,
+                visibility === 'private' && styles.typeChipTextSelected,
+              ]}
+            >
+              Privado
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {visibility === 'private' && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.label}>Usuarios Autorizados</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nombres o IDs (separados por coma)"
+              placeholderTextColor={COLORS.textSecondary}
+              value={authorizedUsers}
+              onChangeText={setAuthorizedUsers}
+            />
+            <Text style={{ ...FONTS.body4, color: COLORS.textSecondary, marginTop: 4 }}>
+              Solo estas personas podrán ver el evento.
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -756,6 +812,8 @@ export default function CreateEventScreen({ navigation, route }) {
       longitude: selectedCoordinate ? selectedCoordinate.longitude : undefined,
       virtualLink: virtualLink || undefined,
       image: coverImage || (initialEvent && initialEvent.image) || undefined,
+      visibility,
+      authorizedUsers: visibility === 'private' ? authorizedUsers.split(',').map(u => u.trim()) : [],
     };
     if (initialEvent && initialEvent.id) {
       payload.id = initialEvent.id;
