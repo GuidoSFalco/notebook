@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Linking, Platform, Alert } from 'react-native';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
-import { MapPin, Calendar, ArrowLeft, Share2, Heart } from 'lucide-react-native';
+import { MapPin, Calendar, ArrowLeft, Share2, Heart, Edit } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GOOGLE_MAPS_API_KEY } from '../config/mapsConfig';
@@ -24,6 +24,50 @@ export default function EventDetailScreen({ route, navigation }) {
         longitudeDelta: 0.01,
       }
     : null;
+
+  const handleAddToCalendar = () => {
+    try {
+      // Create dates
+      const startDate = event.rawDate ? new Date(event.rawDate) : new Date();
+      const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours
+
+      // Format for Google Calendar: YYYYMMDDThhmmssZ
+      const formatDate = (date) => {
+        return date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+      };
+
+      const startStr = formatDate(startDate);
+      const endStr = formatDate(endDate);
+      
+      const title = encodeURIComponent(event.title);
+      const details = encodeURIComponent(event.description || '');
+      const location = encodeURIComponent(event.locationAddress || event.location || '');
+
+      const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${details}&location=${location}`;
+
+      Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo abrir el calendario');
+    }
+  };
+
+  const handleOpenMaps = () => {
+    const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+    const latLng = event.latitude && event.longitude ? `${event.latitude},${event.longitude}` : null;
+    const label = event.title;
+    const url = Platform.select({
+      ios: latLng ? `maps:0,0?q=${label}@${latLng}` : `maps:0,0?q=${encodeURIComponent(event.locationAddress || event.location)}`,
+      android: latLng ? `geo:0,0?q=${latLng}(${encodeURIComponent(label)})` : `geo:0,0?q=${encodeURIComponent(event.locationAddress || event.location)}`
+    });
+
+    if (url) {
+      Linking.openURL(url).catch(() => {
+         // Fallback to web map if app not found
+         const webUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.locationAddress || event.location)}`;
+         Linking.openURL(webUrl);
+      });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -48,8 +92,22 @@ export default function EventDetailScreen({ route, navigation }) {
               <TouchableOpacity style={[styles.iconButton, { marginRight: 10 }]}>
                 <Share2 size={24} color={COLORS.surface} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
+              <TouchableOpacity style={[styles.iconButton, { marginRight: 10 }]}>
                 <Heart size={24} color={COLORS.surface} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() =>
+                  navigation.navigate('EditEvent', {
+                    mode: 'edit',
+                    event,
+                    onSubmit: (updatedEvent) => {
+                      navigation.setParams({ event: updatedEvent });
+                    },
+                  })
+                }
+              >
+                <Edit size={24} color={COLORS.surface} />
               </TouchableOpacity>
             </View>
           </View>
@@ -59,13 +117,7 @@ export default function EventDetailScreen({ route, navigation }) {
             <View style={styles.categoryTag}>
               <Text style={styles.categoryText}>{event.category}</Text>
             </View>
-            <Text style={styles.title}>{event.title}</Text>
-            <View style={styles.row}>
-              <Calendar size={16} color={COLORS.surface} />
-              <Text style={styles.dateText}>
-                {event.endDate ? `${event.date} - ${event.endDate}` : event.date}
-              </Text>
-            </View>
+            
           </View>
         </View>
 
@@ -82,26 +134,34 @@ export default function EventDetailScreen({ route, navigation }) {
               <TouchableOpacity style={styles.followButton}>
                 <Text style={styles.followText}>Seguir</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() =>
-                  navigation.navigate('EditEvent', {
-                    mode: 'edit',
-                    event,
-                    onSubmit: (updatedEvent) => {
-                      navigation.setParams({ event: updatedEvent });
-                    },
-                  })
-                }
-              >
-                <Text style={styles.editButtonText}>Editar</Text>
-              </TouchableOpacity>
             </View>
           </View>
 
+          {/* Title and Category */}
+          <View style={{ marginBottom: SIZES.s }}>
+            <Text style={[styles.title, { color: COLORS.text, marginBottom: 0 }]}>{event.title}</Text>
+          </View>
+
           {/* Description */}
-          <Text style={styles.sectionTitle}>Acerca del evento</Text>
+          {/* <Text style={styles.sectionTitle}>Acerca del evento</Text> */}
           <Text style={styles.description}>{event.description}</Text>
+
+          {/* Date and Time */}
+          <Text style={styles.sectionSubtitle}>Fecha, Hora y Ubicación</Text>
+          <TouchableOpacity onPress={handleAddToCalendar} activeOpacity={0.7}>
+            <View style={styles.locationCard}>
+              <View style={styles.locationIconContainer}>
+                <Calendar size={24} color={COLORS.secondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationName}>
+                  {event.endDate ? `${event.date} - ${event.endDate}` : event.date}
+                </Text>
+                {event.time && <Text style={styles.locationAddress}>{event.time}</Text>}
+                <Text style={[styles.locationAddress, { color: COLORS.primary, marginTop: 4, fontWeight: '600' }]}>Agregar al calendario</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
 
           {isVirtual ? (
             <>
@@ -116,18 +176,20 @@ export default function EventDetailScreen({ route, navigation }) {
             </>
           ) : (
             <>
-              <Text style={styles.sectionTitle}>Ubicación</Text>
-              <View style={styles.locationCard}>
-                <View style={styles.locationIconContainer}>
-                  <MapPin size={24} color={COLORS.primary} />
+              <TouchableOpacity onPress={handleOpenMaps} activeOpacity={0.7}>
+                <View style={styles.locationCard}>
+                  <View style={styles.locationIconContainer}>
+                    <MapPin size={24} color={COLORS.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.locationName}>{event.locationAddress || event.location}</Text>
+                    {event.locationAddress && event.locationAddress !== event.location ? (
+                      <Text style={styles.locationAddress}>{event.locationAddress}</Text>
+                    ) : null}
+                    <Text style={[styles.locationAddress, { color: COLORS.primary, marginTop: 4, fontWeight: '600' }]}>Abrir en maps</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.locationName}>{event.locationAddress || event.location}</Text>
-                  {event.locationAddress && event.locationAddress !== event.location ? (
-                    <Text style={styles.locationAddress}>{event.locationAddress}</Text>
-                  ) : null}
-                </View>
-              </View>
+              </TouchableOpacity>
               {hasCoordinates && mapRegion && (
                 <View style={styles.mapContainer}>
                   <EventMap
@@ -304,6 +366,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SIZES.m,
   },
+  sectionSubtitle: {
+    ...FONTS.h3,
+    fontSize: 18,
+    color: COLORS.text,
+    marginBottom: SIZES.s,
+  },
   description: {
     ...FONTS.body,
     color: COLORS.textSecondary,
@@ -322,7 +390,7 @@ const styles = StyleSheet.create({
   locationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SIZES.xl,
+    marginBottom: SIZES.m,
   },
   locationIconContainer: {
     width: 50,

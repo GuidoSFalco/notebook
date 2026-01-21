@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, Platform, Image } from 'react-native';
-import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, ScrollView, Platform, Image, Animated } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
 import { EVENTS } from '../assets/data';
-import { Search, Filter, Calendar, MapPin, User, ArrowRight, X } from 'lucide-react-native';
+import { Search, Filter, MapPin, User, X, Navigation } from 'lucide-react-native';
+import EventBottomSheet from '../components/EventBottomSheet';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,8 +28,10 @@ export default function MapScreen({ navigation }) {
   const [selectedType, setSelectedType] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [filteredEvents, setFilteredEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
   
-  // Initial region (Buenos Aires mostly based on mock data, but let's center on the first event or a default)
+  // Initial region (Buenos Aires)
   const initialRegion = {
     latitude: -34.6037,
     longitude: -58.3816,
@@ -36,9 +39,30 @@ export default function MapScreen({ navigation }) {
     longitudeDelta: 0.0421,
   };
 
+  const mapRef = useRef(null);
+
   useEffect(() => {
     filterEvents();
   }, [searchQuery, selectedTime, selectedType]);
+
+  // Simulate User Location (In a real app, use expo-location)
+  useEffect(() => {
+    // Mock location near the center for demonstration
+    // If you have expo-location installed:
+    // (async () => {
+    //   let { status } = await Location.requestForegroundPermissionsAsync();
+    //   if (status !== 'granted') return;
+    //   let location = await Location.getCurrentPositionAsync({});
+    //   setUserLocation(location.coords);
+    // })();
+    
+    setTimeout(() => {
+        setUserLocation({
+            latitude: -34.6045,
+            longitude: -58.3825,
+        });
+    }, 1000);
+  }, []);
 
   const filterEvents = () => {
     let result = EVENTS.filter(event => {
@@ -68,7 +92,6 @@ export default function MapScreen({ navigation }) {
         const nextWeek = new Date(today);
         nextWeek.setDate(nextWeek.getDate() + 7);
 
-        // Reset hours for date comparison
         const isSameDay = (d1, d2) => 
           d1.getFullYear() === d2.getFullYear() &&
           d1.getMonth() === d2.getMonth() &&
@@ -85,12 +108,31 @@ export default function MapScreen({ navigation }) {
     setFilteredEvents(result);
   };
 
+  const handleMarkerPress = (event) => {
+    setSelectedEvent(event);
+    // Optional: Center map on event
+    mapRef.current?.animateToRegion({
+        latitude: event.latitude,
+        longitude: event.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+    }, 500);
+  };
+
+  const handleMapPress = () => {
+      if (selectedEvent) {
+          setSelectedEvent(null);
+      }
+  };
+
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={initialRegion}
+        onPress={handleMapPress}
         customMapStyle={[
           {
             featureType: "poi",
@@ -99,6 +141,23 @@ export default function MapScreen({ navigation }) {
           }
         ]}
       >
+        {/* User Location Marker - Distinct Icon */}
+        {userLocation && (
+            <Marker
+                coordinate={userLocation}
+                title="Mi Ubicación"
+                zIndex={999}
+            >
+                <View style={styles.userLocationContainer}>
+                    <View style={styles.userLocationIcon}>
+                         <Navigation size={16} color="#FFF" fill="#FFF" />
+                    </View>
+                    <View style={styles.userLocationPulse} />
+                </View>
+            </Marker>
+        )}
+
+        {/* Event Markers */}
         {filteredEvents.map((event) => (
           <Marker
             key={event.id}
@@ -106,26 +165,19 @@ export default function MapScreen({ navigation }) {
               latitude: event.latitude,
               longitude: event.longitude,
             }}
-            title={event.title}
-            description={event.location}
+            onPress={() => handleMarkerPress(event)}
           >
              <View style={[
                styles.markerContainer, 
-               event.visibility === 'private' ? styles.privateMarker : styles.publicMarker
+               event.visibility === 'private' ? styles.privateMarker : styles.publicMarker,
+               selectedEvent?.id === event.id && styles.selectedMarker
              ]}>
-               {event.visibility === 'private' ? <User size={16} color="#FFF" /> : <MapPin size={16} color="#FFF" />}
+               {event.visibility === 'private' ? (
+                   <User size={16} color="#FFF" />
+               ) : (
+                   <MapPin size={16} color="#FFF" />
+               )}
              </View>
-
-            <Callout tooltip onPress={() => navigation.navigate('EventDetail', { event })}>
-              <View style={styles.calloutContainer}>
-                <Text style={styles.calloutTitle}>{event.title}</Text>
-                <Text style={styles.calloutDate}>{event.date}</Text>
-                <View style={styles.calloutFooter}>
-                  <Text style={styles.calloutPrice}>{event.price}</Text>
-                  <ArrowRight size={14} color={COLORS.primary} />
-                </View>
-              </View>
-            </Callout>
           </Marker>
         ))}
       </MapView>
@@ -197,6 +249,13 @@ export default function MapScreen({ navigation }) {
           </View>
         )}
       </SafeAreaView>
+
+      {/* Bottom Sheet for Event Details */}
+      <EventBottomSheet 
+        event={selectedEvent} 
+        visible={!!selectedEvent}
+        onClose={() => setSelectedEvent(null)} 
+      />
     </View>
   );
 }
@@ -303,30 +362,29 @@ const styles = StyleSheet.create({
   privateMarker: {
     backgroundColor: COLORS.secondary,
   },
-  calloutContainer: {
-    width: 200,
-    backgroundColor: COLORS.surface,
-    padding: SIZES.s,
-    borderRadius: SIZES.radius,
-    ...SHADOWS.medium,
+  userLocationContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: 40,
+      height: 40,
   },
-  calloutTitle: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    marginBottom: 4,
+  userLocationIcon: {
+      backgroundColor: '#2196F3',
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: '#FFF',
+      zIndex: 2,
   },
-  calloutDate: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-  },
-  calloutFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  calloutPrice: {
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
+  userLocationPulse: {
+      position: 'absolute',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(33, 150, 243, 0.3)',
+      zIndex: 1,
+  }
 });

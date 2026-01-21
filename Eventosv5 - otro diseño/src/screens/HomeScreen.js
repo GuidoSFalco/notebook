@@ -48,9 +48,9 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.filterBtn}>
+        {/* <TouchableOpacity style={styles.filterBtn}>
           <SlidersHorizontal size={20} color="#FFF" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
       
       {showZoneInput && (
@@ -250,7 +250,7 @@ export default function HomeScreen({ navigation }) {
           renderExpandedView()
         ) : (
           <>
-            {renderViewToggle()}
+            {/* {renderViewToggle()} */}
             {viewMode === 'grouped' ? renderGroupedView() : renderListView()}
           </>
         )}
