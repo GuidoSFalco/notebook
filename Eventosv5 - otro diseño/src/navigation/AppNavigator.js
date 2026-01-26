@@ -8,6 +8,10 @@ import CreateEventScreen from '../screens/CreateEventScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MyEventsScreen from '../screens/MyEventsScreen';
 import SavedEventsScreen from '../screens/SavedEventsScreen';
+import ExpensesScreen from '../screens/ExpensesScreen';
+import TasksScreen from '../screens/TasksScreen';
+import GalleryScreen from '../screens/GalleryScreen';
+import OrganogramScreen from '../screens/OrganogramScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +38,10 @@ export default function AppNavigator() {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="MyEvents" component={MyEventsScreen} />
         <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
+        <Stack.Screen name="Expenses" component={ExpensesScreen} />
+        <Stack.Screen name="Tasks" component={TasksScreen} />
+        <Stack.Screen name="Gallery" component={GalleryScreen} />
+        <Stack.Screen name="Organogram" component={OrganogramScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

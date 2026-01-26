@@ -1,8 +1,7 @@
-
-import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Linking, Platform, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Linking, Platform, Alert, Modal } from 'react-native';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
-import { MapPin, Calendar, ArrowLeft, Share2, Heart, Edit } from 'lucide-react-native';
+import { MapPin, Calendar, ArrowLeft, Share2, Heart, Edit, DollarSign, ListTodo, Image as ImageIcon, Users, Plus, X, BarChart, Mic, MessageCircle, FileText, Settings, Video, Wifi, Info, Briefcase } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GOOGLE_MAPS_API_KEY } from '../config/mapsConfig';
@@ -10,9 +9,36 @@ import EventMap from '../components/EventMap';
 
 const { width } = Dimensions.get('window');
 
+const ALL_TOOLS = [
+  { id: 'Expenses', name: 'Gastos', icon: DollarSign, color: '#4CAF50' },
+  { id: 'Tasks', name: 'Tareas', icon: ListTodo, color: '#2196F3' },
+  { id: 'Gallery', name: 'Galería', icon: ImageIcon, color: '#E91E63' },
+  { id: 'Organogram', name: 'Organigrama', icon: Users, color: '#FF9800' },
+  { id: 'Analytics', name: 'Analíticas', icon: BarChart, color: '#9C27B0' },
+  { id: 'Speakers', name: 'Speakers', icon: Mic, color: '#673AB7' },
+  { id: 'Chat', name: 'Chat', icon: MessageCircle, color: '#00BCD4' },
+  { id: 'Files', name: 'Archivos', icon: FileText, color: '#607D8B' },
+  { id: 'Config', name: 'Config', icon: Settings, color: '#795548' },
+  { id: 'Live', name: 'En Vivo', icon: Video, color: '#F44336' },
+  { id: 'WiFi', name: 'WiFi', icon: Wifi, color: '#03A9F4' },
+  { id: 'Info', name: 'Info', icon: Info, color: '#FFC107' },
+  { id: 'Sponsors', name: 'Sponsors', icon: Briefcase, color: '#8BC34A' },
+  // ... more tools can be added here
+];
+
 export default function EventDetailScreen({ route, navigation }) {
   const { event } = route.params;
   const insets = useSafeAreaInsets();
+  
+  // State for Tools Management
+  const [myTools, setMyTools] = useState([
+    { id: 'Expenses', name: 'Gastos', icon: DollarSign, color: '#4CAF50' },
+    { id: 'Tasks', name: 'Tareas', icon: ListTodo, color: '#2196F3' },
+    { id: 'Gallery', name: 'Galería', icon: ImageIcon, color: '#E91E63' },
+  ]);
+  const [isToolPickerVisible, setIsToolPickerVisible] = useState(false);
+
+  const isOrganizer = event.role === 'owner' || true; // Mocked for demo, use event.role in production
 
   const isVirtual = event.type === 'virtual' || event.isVirtual;
   const hasCoordinates = typeof event.latitude === 'number' && typeof event.longitude === 'number';
@@ -24,6 +50,15 @@ export default function EventDetailScreen({ route, navigation }) {
         longitudeDelta: 0.01,
       }
     : null;
+
+  const handleAddTool = (tool) => {
+    setMyTools([...myTools, tool]);
+    setIsToolPickerVisible(false);
+  };
+
+  const handleRemoveTool = (toolId) => {
+    setMyTools(myTools.filter(t => t.id !== toolId));
+  };
 
   const handleAddToCalendar = () => {
     try {
@@ -117,7 +152,7 @@ export default function EventDetailScreen({ route, navigation }) {
             <View style={styles.categoryTag}>
               <Text style={styles.categoryText}>{event.category}</Text>
             </View>
-            
+            <Text style={styles.title}>{event.title}</Text>
           </View>
         </View>
 
@@ -137,13 +172,10 @@ export default function EventDetailScreen({ route, navigation }) {
             </View>
           </View>
 
-          {/* Title and Category */}
-          <View style={{ marginBottom: SIZES.s }}>
-            <Text style={[styles.title, { color: COLORS.text, marginBottom: 0 }]}>{event.title}</Text>
-          </View>
+          {/* Event Tools Section (Removed from ScrollView) */}
+          {/* <View style={styles.toolsSection}> ... </View> */}
 
           {/* Description */}
-          {/* <Text style={styles.sectionTitle}>Acerca del evento</Text> */}
           <Text style={styles.description}>{event.description}</Text>
 
           {/* Date and Time */}
@@ -217,16 +249,102 @@ export default function EventDetailScreen({ route, navigation }) {
         </View>
       </ScrollView>
 
-      {/* Bottom Action Bar */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
-        <View>
-          <Text style={styles.priceLabel}>Precio total</Text>
-          <Text style={styles.priceValue}>{event.price}</Text>
+      {/* Persistent Tools Dock (For Organizer) */}
+      {isOrganizer ? (
+        <View style={[styles.toolsDock, { paddingBottom: insets.bottom + 10 }]}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.dockContent}
+          >
+            {myTools.map((tool) => (
+              <TouchableOpacity 
+                key={tool.id} 
+                style={styles.dockItem}
+                onPress={() => {
+                  if (['Expenses', 'Tasks', 'Gallery', 'Organogram'].includes(tool.id)) {
+                     navigation.navigate(tool.id, { event });
+                  } else {
+                     Alert.alert('Próximamente', `La herramienta ${tool.name} estará disponible pronto.`);
+                  }
+                }}
+                onLongPress={() => Alert.alert(
+                  'Eliminar herramienta', 
+                  `¿Deseas quitar ${tool.name} de tu evento?`,
+                  [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Eliminar', onPress: () => handleRemoveTool(tool.id), style: 'destructive' }
+                  ]
+                )}
+              >
+                <View style={[styles.dockIconContainer, { backgroundColor: tool.color }]}>
+                  <tool.icon size={20} color="#FFF" />
+                </View>
+                <Text style={styles.dockLabel}>{tool.name}</Text>
+              </TouchableOpacity>
+            ))}
+            
+            <TouchableOpacity 
+              style={styles.addToolButton}
+              onPress={() => setIsToolPickerVisible(true)}
+            >
+              <View style={styles.addToolIcon}>
+                <Plus size={24} color={COLORS.primary} />
+              </View>
+              <Text style={[styles.dockLabel, { color: COLORS.primary }]}>Agregar</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
-        <TouchableOpacity style={styles.buyButton}>
-          <Text style={styles.buyText}>Comprar Ticket</Text>
-        </TouchableOpacity>
-      </View>
+      ) : (
+        /* Bottom Action Bar (For Attendees) */
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+          <View>
+            <Text style={styles.priceLabel}>Precio total</Text>
+            <Text style={styles.priceValue}>{event.price}</Text>
+          </View>
+          <TouchableOpacity style={styles.buyButton}>
+            <Text style={styles.buyText}>Comprar Ticket</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Tool Picker Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isToolPickerVisible}
+        onRequestClose={() => setIsToolPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Galería de Herramientas</Text>
+              <TouchableOpacity onPress={() => setIsToolPickerVisible(false)} style={styles.closeButton}>
+                <X size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>Selecciona las herramientas que necesitas para tu evento</Text>
+            
+            <ScrollView contentContainerStyle={styles.toolsGrid}>
+              {ALL_TOOLS.filter(t => !myTools.find(mt => mt.id === t.id)).map((tool) => (
+                <TouchableOpacity 
+                  key={tool.id} 
+                  style={styles.gridItem}
+                  onPress={() => handleAddTool(tool)}
+                >
+                  <View style={[styles.gridIcon, { backgroundColor: tool.color + '15' }]}>
+                    <tool.icon size={28} color={tool.color} />
+                  </View>
+                  <Text style={styles.gridLabel}>{tool.name}</Text>
+                  <View style={styles.addButtonMini}>
+                    <Plus size={16} color="#FFF" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -464,5 +582,161 @@ const styles = StyleSheet.create({
     color: COLORS.surface,
     ...FONTS.h3,
     fontSize: 16,
+  },
+  toolsSection: {
+    marginBottom: SIZES.xl,
+  },
+  toolsContainer: {
+    paddingRight: SIZES.l,
+  },
+  toolCard: {
+    alignItems: 'center',
+    marginRight: SIZES.l,
+    width: 80,
+  },
+  toolIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  toolName: {
+    ...FONTS.caption,
+    color: COLORS.text,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  toolsDock: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    ...SHADOWS.large,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  dockContent: {
+    padding: SIZES.m,
+    paddingRight: SIZES.xl,
+    alignItems: 'center',
+  },
+  dockItem: {
+    alignItems: 'center',
+    marginRight: 20,
+    width: 60,
+  },
+  dockIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+    ...SHADOWS.small,
+  },
+  dockLabel: {
+    ...FONTS.caption,
+    fontSize: 10,
+    color: COLORS.text,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  addToolButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+    width: 60,
+  },
+  addToolIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+    backgroundColor: COLORS.background,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: SIZES.l,
+    height: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZES.s,
+  },
+  modalTitle: {
+    ...FONTS.h2,
+    color: COLORS.text,
+  },
+  modalSubtitle: {
+    ...FONTS.body,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.l,
+  },
+  closeButton: {
+    padding: 5,
+  },
+  toolsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: 40,
+  },
+  gridItem: {
+    width: '30%',
+    aspectRatio: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    ...SHADOWS.small,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  gridIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  gridLabel: {
+    ...FONTS.caption,
+    color: COLORS.text,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  addButtonMini: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
