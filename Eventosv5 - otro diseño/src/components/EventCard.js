@@ -1,11 +1,27 @@
-
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
-import { MapPin, Calendar, Heart } from 'lucide-react-native';
+import { MapPin, Calendar, Heart, Image as ImageIcon } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const EventCard = ({ event, onPress, layout = 'vertical', style }) => {
+  const renderEventImage = (imageStyle) => {
+    if (event.image) {
+      return <Image source={{ uri: event.image }} style={imageStyle} />;
+    }
+    return (
+      <View style={[imageStyle, styles.placeholderContainer]}>
+        <LinearGradient
+          colors={COLORS.gradientPrimary}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <ImageIcon size={24} color={COLORS.surface} />
+      </View>
+    );
+  };
+
   if (layout === 'horizontal') {
     return (
       <TouchableOpacity 
@@ -13,7 +29,7 @@ const EventCard = ({ event, onPress, layout = 'vertical', style }) => {
         onPress={onPress}
         activeOpacity={0.9}
       >
-        <Image source={{ uri: event.image }} style={styles.imageHorizontal} />
+        {renderEventImage(styles.imageHorizontal)}
         <View style={styles.contentHorizontal}>
           <Text style={styles.date}>{event.date}</Text>
           <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
@@ -34,7 +50,7 @@ const EventCard = ({ event, onPress, layout = 'vertical', style }) => {
       activeOpacity={0.9}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: event.image }} style={styles.imageVertical} />
+        {renderEventImage(styles.imageVertical)}
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.6)']}
           style={styles.gradientOverlay}
@@ -177,6 +193,11 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: SIZES.radius,
+  },
+  placeholderContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   contentHorizontal: {
     flex: 1,

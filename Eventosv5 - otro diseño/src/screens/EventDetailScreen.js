@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Linking, Platform, Alert, Modal } from 'react-native';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
-import { MapPin, Calendar, ArrowLeft, Share2, Heart, Edit, DollarSign, ListTodo, Image as ImageIcon, Users, Plus, X, BarChart, Mic, MessageCircle, FileText, Settings, Video, Wifi, Info, Briefcase } from 'lucide-react-native';
+import { MapPin, Calendar, ArrowLeft, Share2, Heart, Edit, DollarSign, ListTodo, Image as ImageIcon, Users, Plus, X, BarChart, Mic, MessageCircle, FileText, Settings, Video, Wifi, Info, Briefcase, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GOOGLE_MAPS_API_KEY } from '../config/mapsConfig';
@@ -37,6 +37,7 @@ export default function EventDetailScreen({ route, navigation }) {
     { id: 'Gallery', name: 'Galería', icon: ImageIcon, color: '#E91E63' },
   ]);
   const [isToolPickerVisible, setIsToolPickerVisible] = useState(false);
+  const [isDockExpanded, setIsDockExpanded] = useState(false);
 
   const isOrganizer = event.role === 'owner' || true; // Mocked for demo, use event.role in production
 
@@ -57,7 +58,17 @@ export default function EventDetailScreen({ route, navigation }) {
   };
 
   const handleRemoveTool = (toolId) => {
-    setMyTools(myTools.filter(t => t.id !== toolId));
+    const tool = myTools.find(t => t.id === toolId);
+    if (!tool) return;
+
+    Alert.alert(
+      'Eliminar herramienta', 
+      `¿Estás seguro que deseas quitar ${tool.name} de este evento?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', onPress: () => setMyTools(myTools.filter(t => t.id !== toolId)), style: 'destructive' }
+      ]
+    );
   };
 
   const handleAddToCalendar = () => {
@@ -109,7 +120,19 @@ export default function EventDetailScreen({ route, navigation }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Hero Image */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: event.image }} style={styles.image} />
+          {event.image ? (
+            <Image source={{ uri: event.image }} style={styles.image} />
+          ) : (
+            <View style={[styles.image, { justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.surface }]}>
+              <LinearGradient
+                colors={COLORS.gradientPrimary}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <ImageIcon size={64} color={COLORS.surface} />
+            </View>
+          )}
           <LinearGradient
             colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.8)']}
             style={styles.gradient}
@@ -252,48 +275,60 @@ export default function EventDetailScreen({ route, navigation }) {
       {/* Persistent Tools Dock (For Organizer) */}
       {isOrganizer ? (
         <View style={[styles.toolsDock, { paddingBottom: insets.bottom + 10 }]}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={styles.dockContent}
-          >
-            {myTools.map((tool) => (
-              <TouchableOpacity 
-                key={tool.id} 
-                style={styles.dockItem}
-                onPress={() => {
-                  if (['Expenses', 'Tasks', 'Gallery', 'Organogram'].includes(tool.id)) {
-                     navigation.navigate(tool.id, { event });
-                  } else {
-                     Alert.alert('Próximamente', `La herramienta ${tool.name} estará disponible pronto.`);
-                  }
-                }}
-                onLongPress={() => Alert.alert(
-                  'Eliminar herramienta', 
-                  `¿Deseas quitar ${tool.name} de tu evento?`,
-                  [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Eliminar', onPress: () => handleRemoveTool(tool.id), style: 'destructive' }
-                  ]
-                )}
-              >
-                <View style={[styles.dockIconContainer, { backgroundColor: tool.color }]}>
-                  <tool.icon size={20} color="#FFF" />
-                </View>
-                <Text style={styles.dockLabel}>{tool.name}</Text>
-              </TouchableOpacity>
-            ))}
-            
-            <TouchableOpacity 
-              style={styles.addToolButton}
-              onPress={() => setIsToolPickerVisible(true)}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.dockContent}
             >
-              <View style={styles.addToolIcon}>
-                <Plus size={24} color={COLORS.primary} />
-              </View>
-              <Text style={[styles.dockLabel, { color: COLORS.primary }]}>Agregar</Text>
-            </TouchableOpacity>
-          </ScrollView>
+              <TouchableOpacity 
+                style={styles.addToolButton}
+                onPress={() => setIsToolPickerVisible(true)}
+              >
+                <View style={styles.addToolIcon}>
+                  <Plus size={24} color={COLORS.primary} />
+                </View>
+                <Text style={[styles.dockLabel, { color: COLORS.primary }]}>Agregar</Text>
+              </TouchableOpacity>
+
+              {myTools.slice(0, 4).map((tool) => (
+                <View key={tool.id} style={{ position: 'relative' }}>
+                  <TouchableOpacity 
+                    style={styles.dockItem}
+                    onPress={() => {
+                      if (['Expenses', 'Tasks', 'Gallery', 'Organogram'].includes(tool.id)) {
+                        navigation.navigate(tool.id, { event });
+                      } else {
+                        Alert.alert('Próximamente', `La herramienta ${tool.name} estará disponible pronto.`);
+                      }
+                    }}
+                    onLongPress={() => handleRemoveTool(tool.id)}
+                  >
+                    <View style={[styles.dockIconContainer, { backgroundColor: tool.color }]}>
+                      <tool.icon size={20} color="#FFF" />
+                    </View>
+                    <Text style={styles.dockLabel}>{tool.name}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.removeToolBadge}
+                    onPress={() => handleRemoveTool(tool.id)}
+                  >
+                    <X size={10} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {myTools.length > 4 && (
+                <TouchableOpacity 
+                  style={{ marginLeft: 10, justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => setIsDockExpanded(true)}
+                >
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.border, justifyContent: 'center', alignItems: 'center', marginBottom: 5 }}>
+                     <ChevronUp size={24} color={COLORS.text} />
+                  </View>
+                  <Text style={styles.dockLabel}>Ver más</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
         </View>
       ) : (
         /* Bottom Action Bar (For Attendees) */
@@ -307,6 +342,65 @@ export default function EventDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Expanded Tools Modal (My Tools) */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isDockExpanded}
+        onRequestClose={() => setIsDockExpanded(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Herramientas del Evento</Text>
+              <TouchableOpacity onPress={() => setIsDockExpanded(false)} style={styles.closeButton}>
+                <X size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>Gestiona tus herramientas activas</Text>
+            
+            <ScrollView contentContainerStyle={styles.toolsGrid}>
+                <TouchableOpacity 
+                  style={styles.gridItem}
+                  onPress={() => { setIsDockExpanded(false); setIsToolPickerVisible(true); }}
+                >
+                  <View style={[styles.gridIcon, { backgroundColor: COLORS.primary + '15' }]}>
+                    <Plus size={28} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.gridLabel}>Agregar</Text>
+                </TouchableOpacity>
+
+               {myTools.map((tool) => (
+                 <View key={tool.id} style={styles.gridItem}>
+                    <TouchableOpacity 
+                      style={styles.gridItemInner}
+                      onPress={() => {
+                        setIsDockExpanded(false);
+                        if (['Expenses', 'Tasks', 'Gallery', 'Organogram'].includes(tool.id)) {
+                           navigation.navigate(tool.id, { event });
+                        } else {
+                           Alert.alert('Próximamente', `La herramienta ${tool.name} estará disponible pronto.`);
+                        }
+                      }}
+                    >
+                      <View style={[styles.gridIcon, { backgroundColor: tool.color + '15' }]}>
+                        <tool.icon size={28} color={tool.color} />
+                      </View>
+                      <Text style={styles.gridLabel}>{tool.name}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.removeToolBadge, { top: -5, right: 5, width: 24, height: 24, borderRadius: 12 }]}
+                      onPress={() => handleRemoveTool(tool.id)}
+                    >
+                      <X size={14} color="#FFF" />
+                    </TouchableOpacity>
+                 </View>
+               ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Tool Picker Modal */}
       <Modal
@@ -630,39 +724,51 @@ const styles = StyleSheet.create({
     marginRight: 20,
     width: 60,
   },
-  dockIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  addToolButton: {
+    alignItems: 'center',
+    marginRight: 20,
+    width: 60,
+  },
+  addToolIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
-    ...SHADOWS.small,
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
   },
   dockLabel: {
     ...FONTS.caption,
     fontSize: 10,
-    color: COLORS.text,
     textAlign: 'center',
-    fontWeight: '600',
+    color: COLORS.text,
   },
-  addToolButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-    width: 60,
-  },
-  addToolIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    borderStyle: 'dashed',
+  dockIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
-    backgroundColor: COLORS.background,
+    marginBottom: 5,
+    ...SHADOWS.small,
+  },
+  removeToolBadge: {
+    position: 'absolute',
+    top: -5,
+    right: 15,
+    backgroundColor: COLORS.error,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFF',
+    zIndex: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -674,69 +780,67 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: SIZES.l,
-    height: '80%',
+    height: '70%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SIZES.s,
+    marginBottom: SIZES.m,
   },
   modalTitle: {
-    ...FONTS.h2,
+    ...FONTS.h3,
     color: COLORS.text,
-  },
-  modalSubtitle: {
-    ...FONTS.body,
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: SIZES.l,
   },
   closeButton: {
     padding: 5,
   },
+  modalSubtitle: {
+    ...FONTS.body,
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.l,
+  },
   toolsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
     paddingBottom: 40,
+    justifyContent: 'flex-start',
   },
   gridItem: {
     width: '30%',
-    aspectRatio: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 10,
-    justifyContent: 'center',
+    marginHorizontal: '1.5%',
+    marginBottom: SIZES.l,
     alignItems: 'center',
-    marginBottom: 15,
-    ...SHADOWS.small,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    position: 'relative',
+  },
+  gridItemInner: {
+    alignItems: 'center',
+    width: '100%',
   },
   gridIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   gridLabel: {
     ...FONTS.caption,
-    color: COLORS.text,
     textAlign: 'center',
-    fontWeight: '600',
+    color: COLORS.text,
   },
   addButtonMini: {
     position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 0,
+    right: 0,
     backgroundColor: COLORS.primary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.background,
   },
 });

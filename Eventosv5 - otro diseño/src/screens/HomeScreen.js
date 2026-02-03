@@ -185,7 +185,7 @@ export default function HomeScreen({ navigation }) {
             <EventCard
               event={item}
               layout="vertical"
-              style={{ width: 250, marginRight: 16, marginBottom: 4 }}
+              style={{ width: 250, marginRight: 16, marginBottom: SIZES.m }}
               onPress={() => navigation.navigate('EventDetail', { event: item })}
             />
           )}

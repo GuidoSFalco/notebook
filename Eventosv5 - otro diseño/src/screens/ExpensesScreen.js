@@ -1,17 +1,24 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Alert, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { G, Circle } from 'react-native-svg';
-import { ArrowLeft, Plus, DollarSign, Users, Folder, Trash2, Edit2, Check, X, Search, Filter, PieChart, ChevronRight, UserPlus,UserMinus, Briefcase, TrendingUp, Settings } from 'lucide-react-native';
+import { ArrowLeft, Plus, DollarSign, Users, Folder, Trash2, Edit2, Check, X, Search, Filter, PieChart, ChevronRight, UserPlus, UserMinus, Briefcase, TrendingUp, Settings, Mail, Phone, Heart, UserCheck } from 'lucide-react-native';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
 
 // Mock Data
 const MOCK_PARTICIPANTS = [
-  { id: '1', name: 'Yo', avatar: 'https://i.pravatar.cc/150?u=1', isExternal: false },
-  { id: '2', name: 'Ana', avatar: 'https://i.pravatar.cc/150?u=2', isExternal: false },
-  { id: '3', name: 'Carlos', avatar: 'https://i.pravatar.cc/150?u=3', isExternal: false },
-  { id: '4', name: 'Sofia', avatar: 'https://i.pravatar.cc/150?u=4', isExternal: false },
+  { id: '1', name: 'Yo', avatar: 'https://i.pravatar.cc/150?u=1', isExternal: false, role: 'ADMIN', email: 'yo@email.com', phone: '+54 9 11 1234 5678' },
+  { id: '2', name: 'Ana', avatar: 'https://i.pravatar.cc/150?u=2', isExternal: false, role: 'AUDITOR', email: 'ana@email.com', phone: '+54 9 11 8765 4321' },
+  { id: '3', name: 'Carlos', avatar: 'https://i.pravatar.cc/150?u=3', isExternal: false, role: 'MANAGER', email: 'carlos@email.com', phone: '+54 9 11 2233 4455' },
+  { id: '4', name: 'Sofia', avatar: 'https://i.pravatar.cc/150?u=4', isExternal: false, role: 'USER', email: 'sofia@email.com', phone: '+54 9 11 5566 7788' },
 ];
+
+const ROLES = {
+  ADMIN: { label: 'Admin', color: '#6200EE', canEdit: true, canManage: true },
+  MANAGER: { label: 'Gestor', color: '#03DAC6', canEdit: true, canManage: false },
+  AUDITOR: { label: 'Auditor', color: '#FF9800', canEdit: false, canManage: false },
+  USER: { label: 'Usuario', color: '#95A5A6', canEdit: false, canManage: false },
+};
 
 const CATEGORIES = [
   { id: 'food', name: 'Comida', icon: '🍔', color: '#FF6B6B' },
@@ -22,7 +29,6 @@ const CATEGORIES = [
 ];
 
 const CURRENT_USER_ID = '1'; // Mock current user
-const IS_ADMIN = true; // Toggle for testing permissions
 
 export default function ExpensesScreen({ navigation, route }) {
   const { event } = route.params;
@@ -66,6 +72,9 @@ export default function ExpensesScreen({ navigation, route }) {
   const [participantsModalVisible, setParticipantsModalVisible] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterRole, setFilterRole] = useState('ALL'); // ALL, ADMIN, MANAGER, AUDITOR, USER
+  const [sortBy, setSortBy] = useState('ROLE'); // ROLE, NAME
+  const [selectedParticipant, setSelectedParticipant] = useState(null); // For User Detail Modal
 
   // Derived State
   const totalExpenses = useMemo(() => expenses.reduce((sum, exp) => sum + exp.amount, 0), [expenses]);
@@ -144,8 +153,26 @@ export default function ExpensesScreen({ navigation, route }) {
   }, [expenses, participants]);
 
   const filteredParticipants = useMemo(() => {
-    return participants.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [participants, searchQuery]);
+    let result = participants.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    if (filterRole !== 'ALL') {
+      result = result.filter(p => (p.role || 'USER') === filterRole);
+    }
+
+    // Sorting Logic
+    const rolePriority = { ADMIN: 0, MANAGER: 1, AUDITOR: 2, USER: 3 };
+
+    result.sort((a, b) => {
+      if (sortBy === 'ROLE') {
+        const roleA = rolePriority[a.role || 'USER'];
+        const roleB = rolePriority[b.role || 'USER'];
+        if (roleA !== roleB) return roleA - roleB;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return result;
+  }, [participants, searchQuery, filterRole, sortBy]);
 
   // Actions
   const handleSaveExpense = () => {
@@ -216,13 +243,96 @@ export default function ExpensesScreen({ navigation, route }) {
       name: newPersonName,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newPersonName)}&background=random`,
       isExternal: true,
+      role: 'USER', // Default role
     };
     setParticipants([...participants, newPerson]);
     setNewPersonName('');
   };
 
+  const getUserRole = (userId) => {
+    const participant = participants.find(p => p.id === userId);
+    return participant ? participant.role : 'USER';
+  };
+
   const canEdit = (expense) => {
-    return IS_ADMIN || expense.creatorId === CURRENT_USER_ID;
+    const role = getUserRole(CURRENT_USER_ID);
+    if (role === 'AUDITOR') return false;
+    if (role === 'ADMIN' || role === 'MANAGER') return true;
+    return expense.creatorId === CURRENT_USER_ID;
+  };
+
+  const canAddExpense = () => {
+    const role = getUserRole(CURRENT_USER_ID);
+    return role !== 'AUDITOR';
+  };
+
+  const canManageParticipants = () => {
+    const role = getUserRole(CURRENT_USER_ID);
+    return ROLES[role]?.canManage || false;
+  };
+
+  const handleChangeRole = (userId) => {
+    // Only ADMIN can change roles
+    if (!canManageParticipants()) {
+      Alert.alert('Permiso denegado', 'Solo los administradores pueden cambiar roles.');
+      return;
+    }
+
+    const participant = participants.find(p => p.id === userId);
+    const currentRole = participant.role || 'USER';
+
+    Alert.alert(
+      'Asignar Rol',
+      `Selecciona el rol para ${participant.name}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Admin (Acceso Total)', 
+          onPress: () => updateRole(userId, 'ADMIN'),
+          style: currentRole === 'ADMIN' ? 'default' : 'default'
+        },
+        { 
+          text: 'Gestor (Editar Gastos)', 
+          onPress: () => updateRole(userId, 'MANAGER') 
+        },
+        { 
+          text: 'Auditor (Solo Lectura)', 
+          onPress: () => updateRole(userId, 'AUDITOR') 
+        },
+        { 
+          text: 'Usuario (Sin Privilegios)', 
+          onPress: () => updateRole(userId, 'USER'),
+          style: 'destructive'
+        },
+      ]
+    );
+  };
+
+  const updateRole = (userId, newRole) => {
+    setParticipants(participants.map(p => 
+      p.id === userId ? { ...p, role: newRole } : p
+    ));
+    // Update selected participant if it's the one being edited
+    if (selectedParticipant && selectedParticipant.id === userId) {
+      setSelectedParticipant({ ...selectedParticipant, role: newRole });
+    }
+  };
+
+  const handleWhatsAppContact = (phoneNumber) => {
+    if (!phoneNumber) return;
+    // Limpiar el número para que solo queden dígitos y el signo +
+    const formattedPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const url = `https://wa.me/${formattedPhone}`;
+    
+    Linking.canOpenURL(url)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          Alert.alert('Error', 'WhatsApp no está instalado o no se puede abrir el enlace');
+        }
+      })
+      .catch(err => Alert.alert('Error', 'No se pudo abrir WhatsApp'));
   };
 
   const resetForm = () => {
@@ -426,20 +536,22 @@ export default function ExpensesScreen({ navigation, route }) {
                 {item.involvedIds.length + (item.unregisteredParticipants || 0)} personas incluidas
               </Text>
             </View>
-            <TouchableOpacity 
-              style={{
-                backgroundColor: isUserInvolved ? COLORS.error + '20' : COLORS.primary + '20',
-                padding: 8,
-                borderRadius: 20,
-              }}
-              onPress={() => toggleParticipation(item)}
-            >
-              {isUserInvolved ? (
-                <UserMinus size={20} color={COLORS.error} />
-              ) : (
-                <UserPlus size={20} color={COLORS.primary} />
-              )}
-            </TouchableOpacity>
+            {item.payerId !== CURRENT_USER_ID && canAddExpense() && (
+              <TouchableOpacity 
+                style={{
+                  backgroundColor: isUserInvolved ? COLORS.error + '20' : COLORS.primary + '20',
+                  padding: 8,
+                  borderRadius: 20,
+                }}
+                onPress={() => toggleParticipation(item)}
+              >
+                {isUserInvolved ? (
+                  <UserMinus size={20} color={COLORS.error} />
+                ) : (
+                  <UserPlus size={20} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -528,13 +640,25 @@ export default function ExpensesScreen({ navigation, route }) {
   };
 
   const renderParticipantItem = ({ item }) => (
-    <View style={styles.participantRow}>
+    <TouchableOpacity 
+      style={styles.participantRow}
+      onPress={() => setSelectedParticipant(item)}
+    >
       <Image source={{ uri: item.avatar }} style={styles.avatar} />
-      <View style={styles.participantInfo}>
+      <View style={[styles.participantInfo, { flex: 1 }]}>
         <Text style={styles.participantNameRow}>{item.name}</Text>
-        {item.isExternal && <Text style={styles.participantSubtitle}>Participante Externo</Text>}
+        <Text style={styles.participantSubtitle}>
+          {item.isExternal ? 'Externo • ' : ''}{ROLES[item.role || 'USER'].label}
+        </Text>
       </View>
-    </View>
+      <View 
+        style={[styles.roleBadge, { backgroundColor: ROLES[item.role || 'USER'].color + '20' }]}
+      >
+        <Text style={[styles.roleText, { color: ROLES[item.role || 'USER'].color }]}>
+          {ROLES[item.role || 'USER'].label}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   const renderReportItem = ({ item }) => (
@@ -583,9 +707,11 @@ export default function ExpensesScreen({ navigation, route }) {
           <TouchableOpacity onPress={() => setParticipantsModalVisible(true)} style={styles.iconButton}>
             <UserPlus size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => { resetForm(); setModalVisible(true); }} style={styles.addButton}>
-            <Plus size={24} color={COLORS.primary} />
-          </TouchableOpacity>
+          {canAddExpense() && mode !== 'CORPORATE' && (
+            <TouchableOpacity onPress={() => { resetForm(); setModalVisible(true); }} style={styles.addButton}>
+              <Plus size={24} color={COLORS.primary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -685,17 +811,19 @@ export default function ExpensesScreen({ navigation, route }) {
                       <Text style={styles.headerSubtitle}>{selectedGroup.description}</Text>
                     </View>
                  </View>
-                 <TouchableOpacity 
-                    style={styles.createGroupButton} 
-                    onPress={() => {
-                       resetForm();
-                       setFormData(prev => ({ ...prev, groupId: selectedGroup.id }));
-                       setModalVisible(true);
-                    }}
-                 >
-                    <Plus size={20} color={COLORS.primary} />
-                    <Text style={styles.createGroupText}>Agregar Gasto al Grupo</Text>
-                 </TouchableOpacity>
+                 {canAddExpense() && (
+                   <TouchableOpacity 
+                      style={styles.createGroupButton} 
+                      onPress={() => {
+                         resetForm();
+                         setFormData(prev => ({ ...prev, groupId: selectedGroup.id }));
+                         setModalVisible(true);
+                      }}
+                   >
+                      <Plus size={20} color={COLORS.primary} />
+                      <Text style={styles.createGroupText}>Agregar Gasto al Grupo</Text>
+                   </TouchableOpacity>
+                 )}
                  <FlatList
                     data={expenses.filter(e => e.groupId === selectedGroup.id)}
                     renderItem={renderExpenseItem}
@@ -710,10 +838,12 @@ export default function ExpensesScreen({ navigation, route }) {
               </View>
             ) : (
               <>
-                <TouchableOpacity style={styles.createGroupButton} onPress={() => setGroupModalVisible(true)}>
-                  <Plus size={20} color={COLORS.primary} />
-                  <Text style={styles.createGroupText}>Crear Nuevo Grupo</Text>
-                </TouchableOpacity>
+                {canAddExpense() && (
+                  <TouchableOpacity style={styles.createGroupButton} onPress={() => setGroupModalVisible(true)}>
+                    <Plus size={20} color={COLORS.primary} />
+                    <Text style={styles.createGroupText}>Crear Nuevo Grupo</Text>
+                  </TouchableOpacity>
+                )}
                 <FlatList
                   data={groups}
                   renderItem={renderGroupItem}
@@ -957,6 +1087,9 @@ export default function ExpensesScreen({ navigation, route }) {
               )}
 
               {editingExpense && (
+                (mode === 'SHARED' && activeTab === 'expenses') || 
+                (mode === 'CORPORATE' && activeTab === 'groups' && selectedGroup)
+              ) && (
                 <TouchableOpacity style={styles.deleteButton} onPress={() => {
                     setModalVisible(false);
                     handleDeleteExpense(editingExpense.id);
@@ -1038,17 +1171,52 @@ export default function ExpensesScreen({ navigation, route }) {
               />
             </View>
 
-            <View style={styles.addPersonContainer}>
-              <TextInput
-                style={[styles.input, { flex: 1, marginRight: SIZES.s }]}
-                placeholder="Nombre persona externa"
-                value={newPersonName}
-                onChangeText={setNewPersonName}
-              />
-              <TouchableOpacity style={styles.addPersonButton} onPress={handleAddExternalPerson}>
-                <UserPlus size={20} color="white" />
+            {/* Filters & Sort */}
+            <View style={{ marginBottom: SIZES.m }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                <TouchableOpacity 
+                  style={[styles.filterChip, filterRole === 'ALL' && styles.activeFilterChip]} 
+                  onPress={() => setFilterRole('ALL')}
+                >
+                  <Text style={[styles.filterChipText, filterRole === 'ALL' && styles.activeFilterChipText]}>Todos</Text>
+                </TouchableOpacity>
+                {Object.keys(ROLES).map(roleKey => (
+                  <TouchableOpacity 
+                    key={roleKey}
+                    style={[styles.filterChip, filterRole === roleKey && styles.activeFilterChip]} 
+                    onPress={() => setFilterRole(roleKey)}
+                  >
+                    <Text style={[styles.filterChipText, filterRole === roleKey && styles.activeFilterChipText]}>
+                      {ROLES[roleKey].label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              
+              <TouchableOpacity 
+                style={styles.sortButton} 
+                onPress={() => setSortBy(sortBy === 'ROLE' ? 'NAME' : 'ROLE')}
+              >
+                <Filter size={16} color={COLORS.textSecondary} />
+                <Text style={styles.sortButtonText}>
+                  Ordenado por: {sortBy === 'ROLE' ? 'Rol (Jerarquía)' : 'Nombre (A-Z)'}
+                </Text>
               </TouchableOpacity>
             </View>
+
+            {canAddExpense() && (
+              <View style={styles.addPersonContainer}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginRight: SIZES.s }]}
+                  placeholder="Nombre persona externa"
+                  value={newPersonName}
+                  onChangeText={setNewPersonName}
+                />
+                <TouchableOpacity style={styles.addPersonButton} onPress={handleAddExternalPerson}>
+                  <UserPlus size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+            )}
 
             <FlatList
               data={filteredParticipants}
@@ -1056,6 +1224,113 @@ export default function ExpensesScreen({ navigation, route }) {
               keyExtractor={item => item.id}
               style={{ maxHeight: 400 }}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* User Details Modal */}
+      <Modal
+        visible={!!selectedParticipant}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setSelectedParticipant(null)}
+      >
+        <View style={styles.centeredModalContainer}>
+          <View style={styles.centeredModalContent}>
+            {selectedParticipant && (
+              <>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Perfil</Text>
+                  <TouchableOpacity onPress={() => setSelectedParticipant(null)}>
+                    <X size={24} color={COLORS.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+                  {/* Profile Header */}
+                  <View style={{ alignItems: 'center', marginBottom: SIZES.m }}>
+                    <Image source={{ uri: selectedParticipant.avatar }} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: SIZES.s }} />
+                    <Text style={{ ...FONTS.h2, color: COLORS.text, textAlign: 'center' }}>{selectedParticipant.name}</Text>
+                    <View style={[styles.roleBadge, { marginTop: 8, backgroundColor: ROLES[selectedParticipant.role || 'USER'].color + '20' }]}>
+                      <Text style={[styles.roleText, { color: ROLES[selectedParticipant.role || 'USER'].color }]}>
+                        {ROLES[selectedParticipant.role || 'USER'].label}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Contact Info */}
+                  <View style={{ marginBottom: SIZES.l }}>
+                    <View style={styles.contactRow}>
+                      <Mail size={18} color={COLORS.textSecondary} style={{ marginRight: 12 }} />
+                      <Text style={styles.contactText}>{selectedParticipant.email || 'No disponible'}</Text>
+                    </View>
+                    <View style={styles.contactRow}>
+              <Phone size={18} color={COLORS.textSecondary} style={{ marginRight: 12 }} />
+              {selectedParticipant.phone ? (
+                <TouchableOpacity onPress={() => handleWhatsAppContact(selectedParticipant.phone)}>
+                  <Text style={[styles.contactText, { color: COLORS.primary, fontWeight: '600' }]}>
+                    {selectedParticipant.phone}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.contactText}>No disponible</Text>
+              )}
+            </View>
+                  </View>
+
+                  {/* Social Actions */}
+                  <View style={styles.socialActionsContainer}>
+                    <TouchableOpacity style={styles.socialButton}>
+                      <UserPlus size={20} color={COLORS.primary} />
+                      <Text style={styles.socialButtonText}>Agregar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.socialButton, styles.socialButtonFilled]}>
+                      <Heart size={20} color="white" />
+                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Seguir</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  {/* Role Management (Admin Only) */}
+                  {canManageParticipants() && (
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.sectionTitle}>Gestionar Rol</Text>
+                      {Object.keys(ROLES).map(roleKey => (
+                        <TouchableOpacity
+                          key={roleKey}
+                          style={[
+                            styles.roleOption,
+                            selectedParticipant.role === roleKey && styles.selectedRoleOption,
+                            { borderColor: selectedParticipant.role === roleKey ? ROLES[roleKey].color : COLORS.border }
+                          ]}
+                          onPress={() => updateRole(selectedParticipant.id, roleKey)}
+                        >
+                           <View style={{ flex: 1 }}>
+                              <Text style={[
+                                styles.roleOptionTitle,
+                                selectedParticipant.role === roleKey && { color: ROLES[roleKey].color }
+                              ]}>{ROLES[roleKey].label}</Text>
+                              <Text style={styles.roleOptionDescription}>
+                                 {roleKey === 'ADMIN' && 'Control total del evento.'}
+                                 {roleKey === 'MANAGER' && 'Puede editar gastos.'}
+                                 {roleKey === 'AUDITOR' && 'Solo lectura.'}
+                                 {roleKey === 'USER' && 'Acceso básico.'}
+                              </Text>
+                           </View>
+                           <View style={[
+                             styles.radioButton,
+                             selectedParticipant.role === roleKey && { borderColor: ROLES[roleKey].color }
+                           ]}>
+                              {selectedParticipant.role === roleKey && <View style={[styles.radioButtonSelected, { backgroundColor: ROLES[roleKey].color }]} />}
+                           </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -1404,6 +1679,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SIZES.l,
   },
+  // Centered Modal Styles
+  centeredModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centeredModalContent: {
+    backgroundColor: COLORS.background,
+    borderRadius: SIZES.cardRadius,
+    padding: SIZES.l,
+    width: '85%',
+    maxHeight: '80%',
+    maxWidth: 400,
+    ...SHADOWS.medium,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  contactText: {
+    ...FONTS.body,
+    color: COLORS.text,
+  },
+  socialActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SIZES.l,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    marginHorizontal: 6,
+  },
+  socialButtonFilled: {
+    backgroundColor: COLORS.primary,
+  },
+  socialButtonText: {
+    ...FONTS.body,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginLeft: 8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: SIZES.m,
+  },
   modalTitle: {
     ...FONTS.h2,
     color: COLORS.text,
@@ -1571,6 +1901,7 @@ const styles = StyleSheet.create({
     padding: SIZES.m,
     backgroundColor: COLORS.surface,
     marginBottom: SIZES.s,
+    marginInline: SIZES.xs,
     borderRadius: SIZES.radius,
     ...SHADOWS.small,
   },
@@ -1587,6 +1918,17 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   
+  roleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleText: {
+    ...FONTS.caption,
+    fontWeight: 'bold',
+  },
   // Report Styles
   chartContainer: {
     alignItems: 'center',
@@ -1661,5 +2003,77 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  
+  // Filter & Sort Styles
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: 8,
+  },
+  activeFilterChip: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterChipText: {
+    ...FONTS.caption,
+    color: COLORS.text,
+  },
+  activeFilterChipText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  sortButtonText: {
+    ...FONTS.caption,
+    color: COLORS.textSecondary,
+    marginLeft: 6,
+  },
+
+  // Role Option Styles
+  roleOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SIZES.m,
+    borderWidth: 1,
+    borderRadius: SIZES.radius,
+    marginBottom: SIZES.s,
+    backgroundColor: COLORS.surface,
+  },
+  selectedRoleOption: {
+    backgroundColor: COLORS.surface,
+  },
+  roleOptionTitle: {
+    ...FONTS.body,
+    fontWeight: 'bold',
+    color: COLORS.text,
+  },
+  roleOptionDescription: {
+    ...FONTS.caption,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: SIZES.m,
+  },
+  radioButtonSelected: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 });
