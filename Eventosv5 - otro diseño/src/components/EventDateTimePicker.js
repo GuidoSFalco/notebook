@@ -144,10 +144,19 @@ export default function EventDateTimePicker({
   onToggleEndDate,
   label = 'Fecha y Hora',
   placeholder = 'Seleccionar fecha y hora',
+  visible: controlledVisible,
+  onClose: controlledOnClose,
+  modalOnly = false,
+  includeTime = true,
+  onIncludeTimeChange,
 }) {
-  const [visible, setVisible] = useState(false);
+  const [internalVisible, setInternalVisible] = useState(false);
   const [activePicker, setActivePicker] = useState('start'); // 'start' | 'end'
   
+  const isControlled = controlledVisible !== undefined;
+  const visible = isControlled ? controlledVisible : internalVisible;
+  const setVisible = isControlled ? (val) => !val && controlledOnClose && controlledOnClose() : setInternalVisible;
+
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [timeText, setTimeText] = useState('');
@@ -214,14 +223,25 @@ export default function EventDateTimePicker({
   };
 
   const handleConfirm = () => {
-    const parsed = parseTimeFromText(timeText);
-    if (!parsed) {
-      setTimeError('Horario inválido. Usa el formato HH:MM');
-      return;
+    let newDate = new Date(selectedDate);
+    
+    if (includeTime) {
+      const parsed = parseTimeFromText(timeText);
+      if (!parsed) {
+        setTimeError('Horario inválido. Usa el formato HH:MM');
+        return;
+      }
+      newDate.setHours(parsed.hours, parsed.minutes, 0, 0);
+    } else {
+      // If no time, set to end of day or keeping default?
+      // Usually for due dates, setting to 23:59:59 is good for "Due by end of day"
+      // Or 00:00:00 if we treat it as date only.
+      // Let's stick to keeping whatever hours it has or setting to 00:00
+      // For consistency, let's set to 00:00:00
+      newDate.setHours(0, 0, 0, 0);
     }
-    const newDate = new Date(selectedDate);
-    newDate.setHours(parsed.hours, parsed.minutes, 0, 0);
-    const formatted = formatDateTimeSpanish(newDate);
+
+    const formatted = includeTime ? formatDateTimeSpanish(newDate) : newDate.toLocaleDateString();
 
     // Validation
     if (activePicker === 'end') {
@@ -254,54 +274,58 @@ export default function EventDateTimePicker({
 
   return (
     <>
-      <Text style={styles.label}>{label}</Text>
-      
-      {/* Start Date Picker */}
-      <TouchableOpacity activeOpacity={0.8} onPress={() => handleOpen('start')}>
-        <View style={styles.fieldRow}>
-          <Calendar size={20} color={COLORS.textSecondary} style={styles.fieldIcon} />
-          <Text
-            style={[
-              styles.fieldText,
-              !displayStartText && styles.fieldPlaceholder,
-            ]}
-          >
-            {displayStartText || placeholder}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      {!modalOnly && (
+        <>
+          <Text style={styles.label}>{label}</Text>
+          
+          {/* Start Date Picker */}
+          <TouchableOpacity activeOpacity={0.8} onPress={() => handleOpen('start')}>
+            <View style={styles.fieldRow}>
+              <Calendar size={20} color={COLORS.textSecondary} style={styles.fieldIcon} />
+              <Text
+                style={[
+                  styles.fieldText,
+                  !displayStartText && styles.fieldPlaceholder,
+                ]}
+              >
+                {displayStartText || placeholder}
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-      {/* Toggle End Date */}
-      <View style={styles.switchRow}>
-        <Text style={styles.switchLabel}>Agregar fecha y hora de finalización</Text>
-        <Switch
-          value={hasEndDate}
-          onValueChange={(val) => {
-             if (onToggleEndDate) onToggleEndDate(val);
-             if (!val && onEndDateChange) {
-                onEndDateChange(null, '');
-             }
-          }}
-          trackColor={{ false: '#767577', true: COLORS.primary }}
-          thumbColor={hasEndDate ? '#fff' : '#f4f3f4'}
-        />
-      </View>
-
-      {/* End Date Picker */}
-      {hasEndDate && (
-        <TouchableOpacity activeOpacity={0.8} onPress={() => handleOpen('end')}>
-          <View style={[styles.fieldRow, { marginTop: 8 }]}>
-            <Calendar size={20} color={COLORS.textSecondary} style={styles.fieldIcon} />
-            <Text
-              style={[
-                styles.fieldText,
-                !displayEndText && styles.fieldPlaceholder,
-              ]}
-            >
-              {displayEndText || 'Seleccionar fecha de finalización'}
-            </Text>
+          {/* Toggle End Date */}
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Agregar fecha y hora de finalización</Text>
+            <Switch
+              value={hasEndDate}
+              onValueChange={(val) => {
+                if (onToggleEndDate) onToggleEndDate(val);
+                if (!val && onEndDateChange) {
+                    onEndDateChange(null, '');
+                }
+              }}
+              trackColor={{ false: '#767577', true: COLORS.primary }}
+              thumbColor={hasEndDate ? '#fff' : '#f4f3f4'}
+            />
           </View>
-        </TouchableOpacity>
+
+          {/* End Date Picker */}
+          {hasEndDate && (
+            <TouchableOpacity activeOpacity={0.8} onPress={() => handleOpen('end')}>
+              <View style={[styles.fieldRow, { marginTop: 8 }]}>
+                <Calendar size={20} color={COLORS.textSecondary} style={styles.fieldIcon} />
+                <Text
+                  style={[
+                    styles.fieldText,
+                    !displayEndText && styles.fieldPlaceholder,
+                  ]}
+                >
+                  {displayEndText || 'Seleccionar fecha de finalización'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       <Modal
@@ -371,24 +395,40 @@ export default function EventDateTimePicker({
               })}
             </View>
 
-            <Text style={styles.timeLabel}>Horario</Text>
-            <View style={styles.timeInputRow}>
-              <TextInput
-                style={styles.timeInput}
-                value={timeText}
-                onChangeText={(text) => {
-                  setTimeError('');
-                  setTimeText(normalizeTimeInput(text));
-                }}
-                keyboardType="numeric"
-                placeholder="HH:MM"
-                placeholderTextColor={COLORS.textSecondary}
-                maxLength={5}
-              />
-            </View>
-            {timeError ? (
-              <Text style={styles.timeErrorText}>{timeError}</Text>
-            ) : null}
+            {onIncludeTimeChange && (
+              <View style={[styles.switchRow, { marginTop: SIZES.m, marginBottom: SIZES.s }]}>
+                <Text style={[styles.timeLabel, { marginBottom: 0 }]}>Incluir horario</Text>
+                <Switch
+                  value={includeTime}
+                  onValueChange={onIncludeTimeChange}
+                  trackColor={{ false: '#767577', true: COLORS.primary }}
+                  thumbColor={includeTime ? '#fff' : '#f4f3f4'}
+                />
+              </View>
+            )}
+
+            {includeTime && (
+              <>
+                <Text style={styles.timeLabel}>Horario</Text>
+                <View style={styles.timeInputRow}>
+                  <TextInput
+                    style={styles.timeInput}
+                    value={timeText}
+                    onChangeText={(text) => {
+                      setTimeError('');
+                      setTimeText(normalizeTimeInput(text));
+                    }}
+                    keyboardType="numeric"
+                    placeholder="HH:MM"
+                    placeholderTextColor={COLORS.textSecondary}
+                    maxLength={5}
+                  />
+                </View>
+                {timeError ? (
+                  <Text style={styles.timeErrorText}>{timeError}</Text>
+                ) : null}
+              </>
+            )}
 
             <View style={styles.actionsRow}>
               <TouchableOpacity

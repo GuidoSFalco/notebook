@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Alert, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { G, Circle } from 'react-native-svg';
-import { ArrowLeft, Plus, DollarSign, Users, Folder, Trash2, Edit2, Check, X, Search, Filter, PieChart, ChevronRight, UserPlus, UserMinus, Briefcase, TrendingUp, Settings, Mail, Phone, Heart, UserCheck } from 'lucide-react-native';
+import { ArrowLeft, Plus, DollarSign, Users, Folder, Trash2, Edit2, Check, X, Search, Filter, PieChart, ChevronRight, UserPlus, UserMinus, Briefcase, TrendingUp, Settings, Mail, Phone, Heart, UserCheck, Ban } from 'lucide-react-native';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
 
 // Mock Data
@@ -581,6 +581,63 @@ export default function ExpensesScreen({ navigation, route }) {
     );
   };
 
+  const renderBalanceDetailItem = ({ item }) => {
+    const category = CATEGORIES.find(c => c.id === item.category) || CATEGORIES[4];
+    const payer = participants.find(p => p.id === item.payerId);
+    
+    // Logic for color coding in Balance Detail View
+    // GREEN if current user paid
+    // RED if current user is involved but didn't pay
+    const isPayer = item.payerId === CURRENT_USER_ID;
+    const isUserInvolved = item.involvedIds.includes(CURRENT_USER_ID);
+    
+    let cardBackgroundColor = COLORS.surface;
+    
+    if (isPayer) {
+      cardBackgroundColor = COLORS.success + '15'; // Greenish
+    } else if (isUserInvolved) {
+      cardBackgroundColor = COLORS.error + '10'; // Reddish
+    }
+
+    const totalParticipants = item.involvedIds.length + (item.unregisteredParticipants || 0);
+
+    return (
+      <View 
+        style={[
+          styles.expenseCard, 
+          { 
+            flexDirection: 'column', 
+            alignItems: 'stretch', 
+            padding: SIZES.m, 
+            backgroundColor: cardBackgroundColor,
+            elevation: 0, 
+            shadowOpacity: 0
+          }
+        ]} 
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={[styles.categoryIcon, { backgroundColor: category.color + '20', marginRight: SIZES.m }]}>
+                    <Text style={{ fontSize: 20 }}>{category.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.expenseTitle}>{item.title}</Text>
+                    <Text style={[styles.expenseSubtitle, { color: COLORS.textSecondary }]}>
+                        Pagado por <Text style={{ fontWeight: 'bold', color: COLORS.text }}>{payer?.name}</Text>
+                    </Text>
+                    <Text style={[styles.expenseSubtitle, { color: COLORS.textSecondary, marginTop: 4 }]}>
+                         Dividido entre {totalParticipants} personas
+                    </Text>
+                </View>
+            </View>
+            <View style={styles.expenseAmount}>
+                 <Text style={styles.amountText}>${item.amount.toFixed(2)}</Text>
+            </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderGroupItem = ({ item }) => {
     const groupExpenses = expenses.filter(e => e.groupId === item.id);
     const groupTotal = groupExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -640,20 +697,15 @@ export default function ExpensesScreen({ navigation, route }) {
   };
 
   const renderParticipantItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.participantRow}
-      onPress={() => setSelectedParticipant(item)}
-    >
+    <TouchableOpacity style={styles.userCard} onPress={() => setSelectedParticipant(item)}>
       <Image source={{ uri: item.avatar }} style={styles.avatar} />
-      <View style={[styles.participantInfo, { flex: 1 }]}>
-        <Text style={styles.participantNameRow}>{item.name}</Text>
-        <Text style={styles.participantSubtitle}>
-          {item.isExternal ? 'Externo • ' : ''}{ROLES[item.role || 'USER'].label}
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={styles.userEmail}>
+            {item.email || (item.isExternal ? 'Usuario Externo' : 'Sin email')}
         </Text>
       </View>
-      <View 
-        style={[styles.roleBadge, { backgroundColor: ROLES[item.role || 'USER'].color + '20' }]}
-      >
+      <View style={[styles.roleBadge, { backgroundColor: ROLES[item.role || 'USER'].color + '20' }]}>
         <Text style={[styles.roleText, { color: ROLES[item.role || 'USER'].color }]}>
           {ROLES[item.role || 'USER'].label}
         </Text>
@@ -1280,15 +1332,26 @@ export default function ExpensesScreen({ navigation, route }) {
 
                   {/* Social Actions */}
                   <View style={styles.socialActionsContainer}>
+                    
                     <TouchableOpacity style={styles.socialButton}>
                       <UserPlus size={20} color={COLORS.primary} />
-                      <Text style={styles.socialButtonText}>Agregar</Text>
+                      <Text style={styles.socialButtonText}>Amigo</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.socialButton, styles.socialButtonFilled]}>
-                      <Heart size={20} color="white" />
-                      <Text style={[styles.socialButtonText, { color: 'white' }]}>Seguir</Text>
+                    <TouchableOpacity style={[styles.socialButton, { borderColor: COLORS.error }]}>
+                      <Ban size={20} color={COLORS.error} />
+                      <Text style={[styles.socialButtonText, { color: COLORS.error }]}>Bloquear</Text>
                     </TouchableOpacity>
                   </View>
+
+                  {/* Admin Actions */}
+                  {canManageParticipants() && (
+                    <View style={{ marginBottom: SIZES.l }}>
+                       <TouchableOpacity style={[styles.actionButton, { backgroundColor: COLORS.error + '10', width: '100%', justifyContent: 'center' }]}>
+                         <UserMinus size={20} color={COLORS.error} />
+                         <Text style={[styles.actionButtonText, { color: COLORS.error }]}>Seguir/Dejar de seguir</Text>
+                       </TouchableOpacity>
+                    </View>
+                  )}
 
                   <View style={styles.divider} />
 
@@ -1356,7 +1419,7 @@ export default function ExpensesScreen({ navigation, route }) {
                 if (!selectedBalanceUser) return false;
                 return e.payerId === selectedBalanceUser.id || e.involvedIds.includes(selectedBalanceUser.id);
               })}
-              renderItem={renderExpenseItem}
+              renderItem={renderBalanceDetailItem}
               keyExtractor={item => item.id}
               style={{ maxHeight: '80%' }}
               ListEmptyComponent={<Text style={styles.emptyText}>No hay gastos asociados.</Text>}
@@ -1895,26 +1958,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  participantRow: {
+  // User List Item Styles (Standardized)
+  userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SIZES.m,
     backgroundColor: COLORS.surface,
-    marginBottom: SIZES.s,
-    marginInline: SIZES.xs,
+    padding: SIZES.m,
     borderRadius: SIZES.radius,
-    ...SHADOWS.small,
+    marginBottom: SIZES.s,
+    ...SHADOWS.card,
   },
-  participantInfo: {
-    marginLeft: SIZES.m,
+  userInfo: {
+    flex: 1,
   },
-  participantNameRow: {
-    ...FONTS.body,
-    fontWeight: 'bold',
+  userName: {
+    ...FONTS.h4,
     color: COLORS.text,
+    marginBottom: 2,
   },
-  participantSubtitle: {
-    ...FONTS.caption,
+  userEmail: {
+    ...FONTS.body4,
     color: COLORS.textSecondary,
   },
   
@@ -2075,5 +2138,47 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  
+  // Social Actions Styles
+  socialActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SIZES.l,
+    marginTop: SIZES.s,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    marginHorizontal: 4,
+  },
+  socialButtonFilled: {
+    backgroundColor: COLORS.primary,
+  },
+  socialButtonText: {
+    ...FONTS.caption,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginLeft: 6,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SIZES.m,
+    borderRadius: SIZES.radius,
+    marginHorizontal: 4,
+  },
+  actionButtonText: {
+    ...FONTS.body,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

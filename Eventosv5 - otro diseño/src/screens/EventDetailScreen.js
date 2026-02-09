@@ -147,8 +147,11 @@ export default function EventDetailScreen({ route, navigation }) {
               <ArrowLeft size={24} color={COLORS.surface} />
             </TouchableOpacity>
             <View style={{ flexDirection: 'row' }}>
-              <TouchableOpacity style={[styles.iconButton, { marginRight: 10 }]}>
-                <Share2 size={24} color={COLORS.surface} />
+              <TouchableOpacity 
+                style={[styles.iconButton, { marginRight: 10 }]}
+                onPress={() => navigation.navigate('Organogram', { event })}
+              >
+                <Users size={24} color={COLORS.surface} />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.iconButton, { marginRight: 10 }]}>
                 <Heart size={24} color={COLORS.surface} />
