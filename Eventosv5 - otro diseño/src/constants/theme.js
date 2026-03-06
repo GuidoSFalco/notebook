@@ -12,6 +12,10 @@ export const COLORS = {
   error: '#E3342F',
   gradientPrimary: ['#6C63FF', '#4834D4'],
   gradientSecondary: ['#FF6584', '#FF8E53'],
+  // Floating Dock Colors
+  dockBackground: '#EFEDFA',
+  dockItemActive: '#6C63FF',
+  dockItemInactive: '#757575',
 };
 
 export const SIZES = {

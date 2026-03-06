@@ -6,9 +6,9 @@ import * as Clipboard from 'expo-clipboard';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../constants/theme';
 
 const ROLES = {
-  CREATOR: { label: 'Creador', color: '#FFD700' },
-  ADMIN: { label: 'Admin', color: '#FF5252' },
-  PARTICIPANT: { label: 'Participante', color: '#4CAF50' },
+  ADMIN: { label: 'Administrador', color: '#FF5252' },
+  COLLABORATOR: { label: 'Participante', color: '#4CAF50' },
+  VIEWER: { label: 'Espectador', color: '#95A5A6' },
 };
 
 export default function OrganogramScreen({ navigation, route }) {
@@ -16,11 +16,11 @@ export default function OrganogramScreen({ navigation, route }) {
 
   // Mock Data
   const [users, setUsers] = useState([
-    { id: '1', name: 'Ana Silva', role: 'CREATOR', avatar: 'https://randomuser.me/api/portraits/women/44.jpg', email: 'ana.silva@email.com' },
-    { id: '2', name: 'Carlos Ruiz', role: 'ADMIN', avatar: 'https://randomuser.me/api/portraits/men/32.jpg', email: 'carlos.ruiz@email.com' },
-    { id: '3', name: 'Lucía Méndez', role: 'PARTICIPANT', avatar: 'https://randomuser.me/api/portraits/women/68.jpg', email: 'lucia.mendez@email.com' },
-    { id: '4', name: 'Miguel Ángel', role: 'PARTICIPANT', avatar: 'https://randomuser.me/api/portraits/men/85.jpg', email: 'miguel.angel@email.com' },
-    { id: '5', name: 'Sofía Torres', role: 'PARTICIPANT', avatar: 'https://randomuser.me/api/portraits/women/12.jpg', email: 'sofia.torres@email.com' },
+    { id: '1', name: 'Ana Silva', role: 'ADMIN', avatar: 'https://randomuser.me/api/portraits/women/44.jpg', email: 'ana.silva@email.com' },
+    { id: '2', name: 'Carlos Ruiz', role: 'COLLABORATOR', avatar: 'https://randomuser.me/api/portraits/men/32.jpg', email: 'carlos.ruiz@email.com' },
+    { id: '3', name: 'Lucía Méndez', role: 'COLLABORATOR', avatar: 'https://randomuser.me/api/portraits/women/68.jpg', email: 'lucia.mendez@email.com' },
+    { id: '4', name: 'Miguel Ángel', role: 'VIEWER', avatar: 'https://randomuser.me/api/portraits/men/85.jpg', email: 'miguel.angel@email.com' },
+    { id: '5', name: 'Sofía Torres', role: 'VIEWER', avatar: 'https://randomuser.me/api/portraits/women/12.jpg', email: 'sofia.torres@email.com' },
   ]);
 
   const [selectedUser, setSelectedUser] = useState(null);

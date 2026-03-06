@@ -12,6 +12,7 @@ import ExpensesScreen from '../screens/ExpensesScreen';
 import TasksScreen from '../screens/TasksScreen';
 import GalleryScreen from '../screens/GalleryScreen';
 import OrganogramScreen from '../screens/OrganogramScreen';
+import CateringScreen from '../screens/CateringScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -42,6 +43,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Tasks" component={TasksScreen} />
         <Stack.Screen name="Gallery" component={GalleryScreen} />
         <Stack.Screen name="Organogram" component={OrganogramScreen} />
+        <Stack.Screen name="Catering" component={CateringScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
