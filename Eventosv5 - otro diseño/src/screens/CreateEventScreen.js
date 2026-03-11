@@ -799,6 +799,7 @@ export default function CreateEventScreen({ navigation, route }) {
 
   const buildEventPayload = () => {
     const payload = {
+      ...(initialEvent || {}),
       title,
       category: selectedCategory,
       description,
@@ -815,9 +816,6 @@ export default function CreateEventScreen({ navigation, route }) {
       visibility,
       authorizedUsers: visibility === 'private' ? authorizedUsers.split(',').map(u => u.trim()) : [],
     };
-    if (initialEvent && initialEvent.id) {
-      payload.id = initialEvent.id;
-    }
     return payload;
   };
 

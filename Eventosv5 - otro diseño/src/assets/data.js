@@ -3,8 +3,8 @@ export const EVENTS = [
   {
     id: '1',
     title: 'Neon Summer Festival',
-    date: 'Hoy • 20:00',
-    endDate: 'Hoy • 23:59',
+    date: 'Jueves 21 de Abril • 20:00',
+    endDate: 'Jueves 21 de Abril • 23:59',
     rawDate: new Date().toISOString(),
     location: 'Playa Waikiki',
     locationAddress: 'Playa Waikiki, Lima, Perú',
@@ -99,7 +99,7 @@ export const EVENTS = [
   {
     id: '6',
     title: 'Reunión Secreta de Inversores',
-    date: 'Jueves • 20:00',
+    date: 'Jueves 21 de Abril • 20:00',
     rawDate: new Date(Date.now() + 3 * 86400000).toISOString(),
     location: 'Hotel Alvear',
     locationAddress: 'Av. Alvear 1891, Buenos Aires',

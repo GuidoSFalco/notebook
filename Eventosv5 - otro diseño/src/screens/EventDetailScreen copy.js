@@ -424,40 +424,43 @@ export default function EventDetailScreen({ route, navigation }) {
 
   // --- Helper Components ---
 
-  const CountdownTimer = ({ targetDate, containerStyle }) => {
-    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const CountdownTimer = ({ targetDate }) => {
+    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0 });
 
     useEffect(() => {
       const calculateTimeLeft = () => {
         const difference = +new Date(targetDate) - +new Date();
-        if (difference <= 0) {
-          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-          return;
+        if (difference > 0) {
+          setTimeLeft({
+            days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+            hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+            minutes: Math.floor((difference / 1000 / 60) % 60),
+          });
         }
-
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60),
-        });
       };
 
       calculateTimeLeft();
-      const timer = setInterval(calculateTimeLeft, 1000);
+      const timer = setInterval(calculateTimeLeft, 60000); // Update every minute
 
       return () => clearInterval(timer);
     }, [targetDate]);
 
-    const pad2 = (value) => String(value).padStart(2, '0');
-    const countdownText =
-      timeLeft.days > 0
-        ? `${timeLeft.days} ${pad2(timeLeft.hours)} ${pad2(timeLeft.minutes)} ${pad2(timeLeft.seconds)}`
-        : `${pad2(timeLeft.hours)} ${pad2(timeLeft.minutes)} ${pad2(timeLeft.seconds)}`;
-
     return (
-      <View style={[styles.countdownContainer, containerStyle]}>
-        <Text style={styles.countdownText}>{countdownText}</Text>
+      <View style={styles.countdownContainer}>
+        <View style={styles.countdownItem}>
+          <Text style={styles.countdownValue}>{timeLeft.days}</Text>
+          <Text style={styles.countdownLabel}>Días</Text>
+        </View>
+        <View style={styles.countdownSeparator}><Text style={styles.countdownSeparatorText}>:</Text></View>
+        <View style={styles.countdownItem}>
+          <Text style={styles.countdownValue}>{timeLeft.hours}</Text>
+          <Text style={styles.countdownLabel}>Hs</Text>
+        </View>
+        <View style={styles.countdownSeparator}><Text style={styles.countdownSeparatorText}>:</Text></View>
+        <View style={styles.countdownItem}>
+          <Text style={styles.countdownValue}>{timeLeft.minutes}</Text>
+          <Text style={styles.countdownLabel}>Min</Text>
+        </View>
       </View>
     );
   };
@@ -639,7 +642,7 @@ export default function EventDetailScreen({ route, navigation }) {
         <QuickActionButton icon={MessageCircle} label="Contactar" onPress={() => { }} />
       </View>
 
-      {/* <AttendeesPreview /> */}
+      <AttendeesPreview />
 
       {/* Description */}
       <View
@@ -965,37 +968,19 @@ export default function EventDetailScreen({ route, navigation }) {
             style={styles.heroGradient}
           />
 
+          <CountdownTimer targetDate={event.rawDate || event.date} />
+
           {/* Header Actions */}
           <View style={[styles.headerActions, { top: insets.top + 10 }]}>
-            <TouchableOpacity 
-              style={styles.iconButton} 
-              onPress={() => navigation.goBack()}
-            >
-              <ArrowLeft size={24} color={COLORS.surface} />
+            <TouchableOpacity style={styles.glassBtn} onPress={() => navigation.goBack()}>
+              <ArrowLeft size={24} color="#FFF" />
             </TouchableOpacity>
             <View style={{ flexDirection: 'row' }}>
-              <TouchableOpacity 
-                style={[styles.iconButton, { marginRight: 10 }]}
-                onPress={() => navigation.navigate('Organogram', { event })}
-              >
-                <Users size={24} color={COLORS.surface} />
+              <TouchableOpacity style={[styles.glassBtn, { marginRight: 10 }]}>
+                <Share2 size={24} color="#FFF" />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.iconButton, { marginRight: 10 }]}>
-                <Heart size={24} color={COLORS.surface} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() =>
-                  navigation.navigate('EditEvent', {
-                    mode: 'edit',
-                    event,
-                    onSubmit: (updatedEvent) => {
-                      navigation.setParams({ event: updatedEvent });
-                    },
-                  })
-                }
-              >
-                <Edit size={24} color={COLORS.surface} />
+              <TouchableOpacity style={styles.glassBtn}>
+                <Heart size={24} color="#FFF" />
               </TouchableOpacity>
             </View>
           </View>
@@ -1013,11 +998,6 @@ export default function EventDetailScreen({ route, navigation }) {
             >
               {/* Header Info Card (Floating) */}
               <View style={styles.infoCard}>
-                {/* <CountdownTimer
-                  targetDate={event.rawDate || event.date}
-                  containerStyle={styles.countdownInlineContainer}
-                /> */}
-
                 <View style={styles.categoryBadge}>
                   <Text style={styles.categoryText}>{event.category}</Text>
                 </View>
@@ -1031,7 +1011,7 @@ export default function EventDetailScreen({ route, navigation }) {
 
                 <Text style={styles.eventTitle}>{event.title}</Text>
 
-                {/* <WeatherWidget /> */}
+                <WeatherWidget />
 
                 <View style={[styles.infoRow, event.endDate && { alignItems: 'flex-start' }]}>
                      <Calendar size={18} color={COLORS.primary} style={event.endDate ? { marginTop: 3 } : {}} />
@@ -1359,14 +1339,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 10,
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  glassBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    backdropFilter: 'blur(10px)', // Works on iOS mostly
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   heroContent: {
     position: 'absolute',
@@ -2107,22 +2088,18 @@ const styles = StyleSheet.create({
   },
   // --- New Feature Styles ---
   countdownContainer: {
+    position: 'absolute',
+    bottom: 112, // Centered above Info Card
     alignSelf: 'center', // Centered horizontally
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
-  countdownInlineContainer: {
-    position: 'relative',
-    bottom: 0,
-    marginTop: 0,
-    marginBottom: 6,
-  },
-  countdownText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.primary,
-    fontVariant: ['tabular-nums'],
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    zIndex: 20,
   },
   countdownItem: {
     alignItems: 'center',
